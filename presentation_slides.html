@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGE-DEBRIS-1U: Autonomous Edge-AI Space Debris Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: rgba(18, 26, 43, 0.75);
+    --border-card: rgba(56, 189, 248, 0.25);
+    --accent-cyan: #38bdf8;
+    --accent-blue: #3b82f6;
+    --accent-emerald: #10b981;
+    --accent-rose: #f43f5e;
+    --accent-amber: #f59e0b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-image: 
+      radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+  }
+
+  .slide-container {
+    width: 95vw;
+    max-width: 1400px;
+    height: 86vh;
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(56, 189, 248, 0.1);
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    padding: 40px 60px;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: translateX(40px);
+  }
+
+  .slide.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
+  }
+
+  /* Slide Headers */
+  .slide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    padding-bottom: 16px;
+  }
+
+  .slide-badge {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent-cyan);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  .slide-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, #ffffff 40%, var(--accent-cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .slide-subtitle {
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* Content Layouts */
+  .content-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  .card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+  }
+
+  .card-highlight {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%);
+  }
+
+  .card-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-desc {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .card-stat {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  /* Process Flow Steps */
+  .flow-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    margin: 20px 0;
+  }
+
+  .flow-node {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 16px;
+    padding: 24px 16px;
+    text-align: center;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  }
+
+  .flow-node.active-node {
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.2);
+  }
+
+  .flow-step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+
+  .flow-node-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .flow-node-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+  }
+
+  .flow-arrow {
+    color: var(--accent-cyan);
+    font-size: 1.8rem;
+    font-weight: bold;
+    animation: pulseArrow 2s infinite ease-in-out;
+  }
+
+  @keyframes pulseArrow {
+    0%, 100% { transform: translateX(0); opacity: 0.6; }
+    50% { transform: translateX(5px); opacity: 1; }
+  }
+
+  /* Split Layout */
+  .split-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    flex: 1;
+  }
+
+  /* Comparison Visual Table */
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .comp-table th {
+    text-align: left;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--accent-cyan);
+    font-weight: 700;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .comp-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .badge-bad {
+    color: var(--accent-rose);
+    background: rgba(244, 63, 94, 0.12);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .badge-good {
+    color: var(--accent-emerald);
+    background: rgba(16, 185, 129, 0.15);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  /* Controls */
+  .controls {
+    position: absolute;
+    bottom: 24px;
+    left: 60px;
+    right: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 16px;
+  }
+
+  .btn {
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    background: var(--accent-cyan);
+    color: #000;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+  }
+
+  .slide-dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .dot.active {
+    background: var(--accent-cyan);
+    width: 28px;
+    border-radius: 10px;
+  }
+
+  .key-shortcut {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<div class="slide-container">
+
+  <!-- SLIDE 1: TITLE & MISSION -->
+  <div class="slide active" id="slide-1">
+    <div class="slide-header">
+      <div class="slide-badge">Autonomous Space Situational Awareness</div>
+      <div class="key-shortcut">Slide 1 of 6 [Use Left / Right Arrows]</div>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; max-width: 900px; margin: 0 auto;">
+      <div style="font-size: 4rem; margin-bottom: 10px;">🛰️ ⚡ 🔍</div>
+      <h1 class="slide-title" style="font-size: 3.2rem; line-height: 1.15; margin-bottom: 16px;">EDGE-DEBRIS-1U</h1>
+      <p style="font-size: 1.3rem; color: var(--accent-cyan); font-weight: 600; margin-bottom: 20px;">
+        Autonomous Onboard Edge-AI for Optical Space Debris Detection & Intelligent Data Reduction
+      </p>
+      <p style="font-size: 1.05rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 30px;">
+        Transforming bandwidth-limited nano-satellites from passive cameras into real-time perceptual intelligence nodes. Detecting lethal 1–10 cm space debris and discarding 99.98% of empty space on-orbit.
+      </p>
+      <div style="display: flex; gap: 24px;">
+        <div style="background: rgba(56,189,248,0.1); border: 1px solid var(--accent-cyan); padding: 12px 24px; border-radius: 12px;">
+          <div style="font-family: var(--font-mono); font-size: 1.6rem; font-weight: 800; color: #fff;">1U CubeSat</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Form Factor</div>
+        </div>
+        <div style="background: rgba(16,185,129,0.1); border: 1px solid var(--accent-emerald); padding: 12px 24px; border-radius: 12px;">
+          <div style="font-family: var(--font-mono); font-size: 1.6rem; font-weight: 800; color: var(--accent-emerald);">&lt; 2.5 Watts</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Payload Power</div>
+        </div>
+        <div style="background: rgba(59,130,246,0.1); border: 1px solid var(--accent-blue); padding: 12px 24px; border-radius: 12px;">
+          <div style="font-family: var(--font-mono); font-size: 1.6rem; font-weight: 800; color: var(--accent-cyan);">&gt; 99.98%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Bandwidth Saved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: THE CORE PROBLEM -->
+  <div class="slide" id="slide-2">
+    <div class="slide-header">
+      <div>
+        <h2 class="slide-title">The Problem: The Telemetry Chokepoint</h2>
+        <p class="slide-subtitle">Why traditional space debris tracking fails on small satellites</p>
+      </div>
+      <div class="slide-badge" style="background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border-color: var(--accent-rose);">The Reality Check</div>
+    </div>
+    <div class="split-layout">
+      <div class="card" style="border-color: rgba(244, 63, 94, 0.3);">
+        <div class="card-icon">📡❌</div>
+        <h3 class="card-title" style="color: var(--accent-rose);">The Downlink Math Problem</h3>
+        <p class="card-desc">
+          A standard low-noise camera generates <b>186 Megabits of raw image data every second</b>. Over an orbit, this generates <b>125 Gigabytes</b> of video data.<br><br>
+          A 1U CubeSat is limited to an amateur UHF radio link at only <b>9.6 kbps</b>. Downloading a single full-resolution image takes <b>over 30 minutes</b>.
+        </p>
+        <div class="card-stat">
+          <span class="stat-label">Traditional Method</span>
+          <span class="stat-val" style="color: var(--accent-rose);">40+ Years to Downlink 1 Orbit</span>
+        </div>
+      </div>
+      <div class="card card-highlight">
+        <div class="card-icon">💡🚀</div>
+        <h3 class="card-title" style="color: var(--accent-emerald);">Our Edge-AI Paradigm Shift</h3>
+        <p class="card-desc">
+          <b>Never downlink the pixels!</b> The universe is 99.9% empty black space. <br><br>
+          Our onboard Edge-AI detects the debris streak, extracts the exact coordinates and visual brightness, formats it into a tiny <b>178-byte text packet</b>, and permanently deletes the empty image in space.
+        </p>
+        <div class="card-stat">
+          <span class="stat-label">Our Event Downlink</span>
+          <span class="stat-val" style="color: var(--accent-emerald);">3,200+ Detections per Pass</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: THE 5-STEP WORKFLOW -->
+  <div class="slide" id="slide-3">
+    <div class="slide-header">
+      <div>
+        <h2 class="slide-title">How It Works: 5-Step Autonomous Pipeline</h2>
+        <p class="slide-subtitle">From raw optical capture to ground alert in under 30 milliseconds</p>
+      </div>
+      <div class="slide-badge">End-to-End Flow</div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="flow-step-num">1</div>
+        <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+        <div class="flow-node-title">Capture</div>
+        <div class="flow-node-desc">Sony IMX296 Global Shutter exposes dark space at 10 fps (60 ms exposure).</div>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node">
+        <div class="flow-step-num">2</div>
+        <div style="font-size: 2rem; margin-bottom: 8px;">✨❌</div>
+        <div class="flow-node-title">Erase Stars</div>
+        <div class="flow-node-desc">Temporal differencing cancels 95% of stationary background stars in &lt;10 ms.</div>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node active-node">
+        <div class="flow-step-num" style="background: var(--accent-emerald);">3</div>
+        <div style="font-size: 2rem; margin-bottom: 8px;">🧠</div>
+        <div class="flow-node-title">AI Verify</div>
+        <div class="flow-node-desc">Google Coral TPU runs DebrisNet-Tiny in 3.8 ms to reject cosmic ray spikes.</div>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node">
+        <div class="flow-step-num">4</div>
+        <div style="font-size: 2rem; margin-bottom: 8px;">🗑️💾</div>
+        <div class="flow-node-title">Compress</div>
+        <div class="flow-node-desc">Delete 2.3 MB raw image. Keep only 180-byte J2000 coordinate packet.</div>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node">
+        <div class="flow-step-num">5</div>
+        <div style="font-size: 2rem; margin-bottom: 8px;">📡</div>
+        <div class="flow-node-title">Alert Earth</div>
+        <div class="flow-node-desc">Event-driven packet beamed to ground station over basic UHF/S-Band.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: THE HARDWARE ARCHITECTURE -->
+  <div class="slide" id="slide-4">
+    <div class="slide-header">
+      <div>
+        <h2 class="slide-title">Physical Hardware Integration</h2>
+        <p class="slide-subtitle">NASA-proven, ultra-low power COTS components fitted into 1U</p>
+      </div>
+      <div class="slide-badge">Hardware Sync</div>
+    </div>
+    <div class="content-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="card">
+        <div class="card-icon">📸</div>
+        <h3 class="card-title">Sony IMX296 Mono CMOS</h3>
+        <p class="card-desc">
+          • Global shutter exposes all pixels at once (zero streak distortion).<br>
+          • 35mm f/1.4 lens (8.1° x 6.1° FOV).<br>
+          • Power draw: <b>0.35 Watts</b>. Cost: <b>~$70</b>.
+        </p>
+        <div class="card-stat">
+          <span class="stat-label">Interface</span>
+          <span class="stat-val" style="font-size: 1.1rem;">MIPI CSI-2</span>
+        </div>
+      </div>
+      <div class="card card-highlight">
+        <div class="card-icon">⚡🧠</div>
+        <h3 class="card-title">Google Coral Edge TPU</h3>
+        <p class="card-desc">
+          • 4.0 TOPS INT8 deep learning engine.<br>
+          • Proton-beam radiation tested by NASA GSFC.<br>
+          • Power: <b>2.0W active / 0.5W idle</b>. Cost: <b>~$35</b>.
+        </p>
+        <div class="card-stat">
+          <span class="stat-label">Interface</span>
+          <span class="stat-val" style="font-size: 1.1rem;">PCIe Gen 2 x1</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️💻</div>
+        <h3 class="card-title">Host OBC & Supervisor</h3>
+        <p class="card-desc">
+          • Raspberry Pi CM4 (Quad ARM A72).<br>
+          • Rad-Hard ATmegaS128 supervisor resets latchup faults in &lt;10 µs.<br>
+          • Copper thermal strap to cold rail.
+        </p>
+        <div class="card-stat">
+          <span class="stat-label">Thermal Sink</span>
+          <span class="stat-val" style="font-size: 1.1rem;">-Y Chassis Face</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: SYSTEM COMPARISON TABLE -->
+  <div class="slide" id="slide-5">
+    <div class="slide-header">
+      <div>
+        <h2 class="slide-title">Technology Trade Study & Advantages</h2>
+        <p class="slide-subtitle">Why this solution wins in cost, power, and feasibility</p>
+      </div>
+      <div class="slide-badge">Competitor Analysis</div>
+    </div>
+    <div class="card" style="padding: 10px;">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Subsystem / Parameter</th>
+            <th>Conventional Aerospace Solution</th>
+            <th>Edge-Debris-1U Recommended Architecture</th>
+            <th>Your Innovation Advantage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>AI Compute Chip</b></td>
+            <td>Space-grade DPU (e.g. Unibap) <br><span class="badge-bad">$25,000 – $50,000</span></td>
+            <td>Google Coral Edge TPU (M.2) <br><span class="badge-good">~$35 Off-the-Shelf</span></td>
+            <td>NASA-proven compute at 1% of the cost</td>
+          </tr>
+          <tr>
+            <td><b>Power Consumption</b></td>
+            <td>NVIDIA Jetson / Desktop GPUs <br><span class="badge-bad">10 – 25 Watts</span></td>
+            <td>Dedicated Coral TPU + ARM SIMD <br><span class="badge-good">&lt; 2.4 Watts Peak</span></td>
+            <td>Operates within 1U solar harvesting limits</td>
+          </tr>
+          <tr>
+            <td><b>Camera Shutter</b></td>
+            <td>Consumer Rolling-Shutter <br><span class="badge-bad">Curved streak blur</span></td>
+            <td>Sony IMX296 Global Shutter <br><span class="badge-good">Zero geometric smear</span></td>
+            <td>Enables sub-pixel astrometric orbit calculations</td>
+          </tr>
+          <tr>
+            <td><b>Telemetry Downlink</b></td>
+            <td>Downlink 2.3 MB full images <br><span class="badge-bad">Requires 30 min / image</span></td>
+            <td>178-Byte Event JSON Packets <br><span class="badge-good">3,200+ Detections / pass</span></td>
+            <td>&gt; 99.98% bandwidth reduction</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: SUMMARY & TESTING ROADMAP -->
+  <div class="slide" id="slide-6">
+    <div class="slide-header">
+      <div>
+        <h2 class="slide-title">Testing Roadmap & Summary</h2>
+        <p class="slide-subtitle">Low-cost validation from balloon prototype to orbital deployment</p>
+      </div>
+      <div class="slide-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border-color: var(--accent-emerald);">Ready for Flight</div>
+    </div>
+    <div class="split-layout">
+      <div class="card">
+        <h3 class="card-title">🎈 35 km Stratospheric Balloon Test</h3>
+        <p class="card-desc">
+          • <b>99% Vacuum Replicated:</b> Proves passive thermal heat-straps work under low atmospheric pressure.<br>
+          • <b>Optical Target Injection:</b> High-speed collimator projects calibrated debris streaks into dark sky.<br>
+          • <b>LoRa Ground Verification:</b> Confirms real-time event packet downlinks before building orbital model.<br>
+          • <b>Cost:</b> &lt; $1,500 total balloon launch budget.
+        </p>
+      </div>
+      <div class="card card-highlight">
+        <h3 class="card-title">🚀 Summary Takeaways</h3>
+        <p class="card-desc">
+          1. <b>Solved the Data Deluge:</b> Discarding empty space cuts bandwidth by 99.98%.<br>
+          2. <b>Fits 1U Limits:</b> 2.4W peak power, 943 g mass, 0.35U optical payload.<br>
+          3. <b>Financially Feasible:</b> Built with NASA-tested COTS hardware for under $800.<br>
+          4. <b>Actionable SSA Data:</b> Outputs real J2000 celestial vectors for global catalogs.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn" id="prevBtn" onclick="prevSlide()">❮ Previous</button>
+    <div class="slide-dots" id="dotsContainer"></div>
+    <button class="btn" id="nextBtn" onclick="nextSlide()">Next ❯</button>
+  </div>
+
+</div>
+
+<script>
+  let currentSlide = 0;
+  const slides = document.querySelectorAll('.slide');
+  const dotsContainer = document.getElementById('dotsContainer');
+
+  // Initialize dots
+  slides.forEach((_, idx) => {
+    const dot = document.createElement('div');
+    dot.classList.add('dot');
+    if (idx === 0) dot.classList.add('active');
+    dot.addEventListener('click', () => goToSlide(idx));
+    dotsContainer.appendChild(dot);
+  });
+
+  const dots = document.querySelectorAll('.dot');
+
+  function updateSlide() {
+    slides.forEach((slide, idx) => {
+      slide.classList.toggle('active', idx === currentSlide);
+    });
+    dots.forEach((dot, idx) => {
+      dot.classList.toggle('active', idx === currentSlide);
+    });
+  }
+
+  function nextSlide() {
+    currentSlide = (currentSlide + 1) % slides.length;
+    updateSlide();
+  }
+
+  function prevSlide() {
+    currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+    updateSlide();
+  }
+
+  function goToSlide(idx) {
+    currentSlide = idx;
+    updateSlide();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+    if (e.key === 'ArrowLeft') prevSlide();
+  });
+</script>
+
+</body>
+</html>

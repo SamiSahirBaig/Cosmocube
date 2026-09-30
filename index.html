@@ -1,0 +1,2314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EDGE-DEBRIS-1U // Mission Control Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-primary: #05080D;
+    --bg-secondary: #070B12;
+    --bg-surface: #0B111A;
+    --bg-card: #0F1722;
+    --border-subtle: rgba(120, 160, 190, 0.15);
+    --border-highlight: rgba(0, 240, 255, 0.4);
+    --accent-cyan: #00F0FF;
+    --accent-green: #10B981;
+    --accent-amber: #F59E0B;
+    --accent-red: #EF4444;
+    --accent-blue: #3B82F6;
+    --accent-violet: #A855F7;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --font-sans: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    user-select: none;
+  }
+
+  /* Scanlines Overlay */
+  body::before {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+    background-size: 100% 4px;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* Aerospace Technical Grid Background */
+  .grid-bg {
+    background-image: 
+      linear-gradient(rgba(120, 160, 190, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120, 160, 190, 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(120, 160, 190, 0.25);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-cyan);
+  }
+
+  /* Typography Utilities */
+  .font-mono { font-family: var(--font-mono); }
+  .font-sans { font-family: var(--font-sans); }
+
+  /* Buttons & Micro Badges */
+  .hud-btn {
+    background: rgba(11, 17, 26, 0.8);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hud-btn:hover {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  }
+  .hud-btn.active {
+    background: rgba(0, 240, 255, 0.12);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+  }
+  .hud-btn.danger {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #FCA5A5;
+  }
+  .hud-btn.danger:hover {
+    border-color: var(--accent-red);
+    color: white;
+    background: rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  }
+
+  /* Card Surfaces */
+  .hud-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  .hud-card::after {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 6px; height: 6px;
+    border-top: 1px solid var(--border-highlight);
+    border-right: 1px solid var(--border-highlight);
+  }
+
+  /* Blinking Indicators */
+  @keyframes blink-nominal {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+  .pulse-green {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    display: inline-block;
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: blink-nominal 1.8s infinite ease-in-out;
+  }
+  .pulse-cyan {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background-color: var(--accent-cyan);
+    display: inline-block;
+    box-shadow: 0 0 8px var(--accent-cyan);
+    animation: blink-nominal 1.4s infinite ease-in-out;
+  }
+  .pulse-red {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background-color: var(--accent-red);
+    display: inline-block;
+    box-shadow: 0 0 10px var(--accent-red);
+    animation: blink-nominal 0.8s infinite ease-in-out;
+  }
+
+  /* Pulse glowing animation */
+  @keyframes data-pulse {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(100%); opacity: 0; }
+  }
+</style>
+</head>
+<body class="grid-bg">
+
+  <!-- ========================================== -->
+  <!-- TOP STATUS BAR (SECTION 3) -->
+  <!-- ========================================== -->
+  <header style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); padding: 6px 16px; font-family: var(--font-mono); font-size: 11px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+      
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <div><span style="color: var(--text-muted);">CUBESAT:</span> <strong style="color: var(--accent-cyan);">BX-01</strong></div>
+        <div><span style="color: var(--text-muted);">MISSION:</span> <strong style="color: #fff;">DEBRIS-01</strong></div>
+        <div><span style="color: var(--text-muted);">ORBIT:</span> <span style="color: var(--accent-blue);">LEO (SSO 97.4°)</span></div>
+        <div><span style="color: var(--text-muted);">ALTITUDE:</span> <span id="telemetry-alt" style="color: #fff;">~519.4 KM</span></div>
+        <div><span style="color: var(--text-muted);">VELOCITY:</span> <span id="telemetry-vel" style="color: #fff;">~7.61 KM/S</span></div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="pulse-green"></span>
+          <span style="color: var(--text-muted);">STATUS:</span>
+          <span style="color: var(--accent-green); font-weight: 600;">NOMINAL</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="pulse-cyan"></span>
+          <span style="color: var(--text-muted);">EDGE AI:</span>
+          <span style="color: var(--accent-cyan); font-weight: 600;">ACTIVE [INT8]</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="pulse-cyan"></span>
+          <span style="color: var(--text-muted);">CAMERA:</span>
+          <span style="color: #fff; font-weight: 600;">ONLINE [IMX296]</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="pulse-green"></span>
+          <span style="color: var(--text-muted);">TELEMETRY:</span>
+          <span style="color: var(--accent-blue); font-weight: 600;">LINK ACTIVE (UHF)</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--text-muted);">POWER:</span>
+          <div style="width: 48px; height: 10px; background: #1E293B; border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle;">
+            <div id="battery-fill" style="width: 92%; height: 100%; background: var(--accent-green); transition: width 0.5s;"></div>
+          </div>
+          <span id="battery-text" style="color: var(--accent-green); font-weight: 700;">92%</span>
+        </div>
+
+        <div>
+          <span style="color: var(--text-muted);">DATA BUFFER:</span>
+          <span id="buffer-text" style="color: var(--accent-amber); font-weight: 700;">34% (78 KB)</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- MAIN NAVIGATION & CONTROLS (SECTION 2 & 18) -->
+  <!-- ========================================== -->
+  <nav style="background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); padding: 8px 16px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+      
+      <!-- Top Left Branding -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 32px; height: 32px; background: rgba(0, 240, 255, 0.1); border: 1px solid var(--accent-cyan); display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 15px; font-weight: 800; letter-spacing: 1.5px; color: #fff;">EDGE-DEBRIS-1U</span>
+            <span style="font-size: 9px; font-family: var(--font-mono); background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); color: #D8B4FE; padding: 1px 6px; border-radius: 2px;">
+              SIH 2026 // TEAM BOXSTER
+            </span>
+          </div>
+          <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.5px;">
+            ONBOARD EDGE-AI SPACE DEBRIS DETECTION & TRACKING SYSTEM
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Center Mission Indicator -->
+      <div style="text-align: center; display: none; @media(min-width: 900px){ display: block; }">
+        <div style="font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--accent-cyan); font-family: var(--font-mono);">
+          MISSION CONTROL // LIVE OPERATIONS
+        </div>
+        <div style="font-size: 9px; color: var(--text-secondary); font-family: var(--font-mono);">
+          1U CUBESAT AUTONOMOUS SPACE SURVEILLANCE
+        </div>
+      </div>
+
+      <!-- Top Right Controls & Clocks -->
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        
+        <!-- Simulate Debris Event Button (SECTION 19) -->
+        <button id="btn-trigger-event" class="hud-btn danger" style="padding: 6px 14px; font-weight: 700; border-width: 1.5px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          SIMULATE DEBRIS EVENT (10s)
+        </button>
+
+        <!-- Sim Speed Toggle -->
+        <div style="display: flex; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; overflow: hidden;">
+          <button class="hud-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
+          <button class="hud-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
+          <button class="hud-btn" data-speed="5" onclick="setSpeed(5)">5x</button>
+        </div>
+
+        <button id="btn-play-pause" class="hud-btn" onclick="togglePause()">
+          <span id="pause-icon">⏸</span> <span id="pause-text">PAUSE</span>
+        </button>
+
+        <!-- Real-Time Clocks -->
+        <div style="font-family: var(--font-mono); font-size: 11px; text-align: right; border-left: 1px solid var(--border-subtle); padding-left: 12px;">
+          <div id="clock-utc" style="color: #fff; font-weight: 600;">12:42:18 UTC</div>
+          <div id="clock-met" style="color: var(--text-muted); font-size: 10px;">MET 09d 17:42:18</div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 7 Navigation Tabs (SECTION 2) -->
+    <div style="display: flex; gap: 4px; margin-top: 8px; border-top: 1px solid rgba(120, 160, 190, 0.08); padding-top: 6px; overflow-x: auto;">
+      <button class="hud-btn active" onclick="switchTab('OVERVIEW')">1. OVERVIEW</button>
+      <button class="hud-btn" onclick="switchTab('CAMERA')">2. CAMERA</button>
+      <button class="hud-btn" onclick="switchTab('EDGE_AI')">3. EDGE AI</button>
+      <button class="hud-btn" onclick="switchTab('TRACKING')">4. DEBRIS TRACKING</button>
+      <button class="hud-btn" onclick="switchTab('TELEMETRY')">5. TELEMETRY</button>
+      <button class="hud-btn" onclick="switchTab('POWER')">6. POWER</button>
+      <button class="hud-btn" onclick="switchTab('LOGS')">7. SYSTEM LOGS</button>
+    </div>
+  </nav>
+
+  <!-- Event Showcase Progress Bar Overlay -->
+  <div id="event-progress-bar-container" style="display: none; height: 3px; background: rgba(239, 68, 68, 0.2); width: 100%;">
+    <div id="event-progress-fill" style="width: 0%; height: 100%; background: var(--accent-red); transition: width 0.2s linear; box-shadow: 0 0 10px var(--accent-red);"></div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MAIN DASHBOARD CONTENT AREA -->
+  <!-- ========================================== -->
+  <main style="flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
+
+    <!-- TAB 1: OVERVIEW (DEFAULT) -->
+    <div id="tab-overview" class="tab-content" style="display: flex; flex-direction: column; gap: 12px;">
+      
+      <!-- Top Row: Performance Metrics Ticker (SECTION 15) -->
+      <section class="hud-card" style="padding: 8px 16px; font-family: var(--font-mono); font-size: 11px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; align-items: center;">
+          
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">FRAMES PROCESSED</div>
+            <div id="metric-frames" style="font-size: 15px; font-weight: 700; color: #fff;">18,427</div>
+            <div style="font-size: 8px; color: var(--accent-cyan);">Global Shutter 30 FPS</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">OBJECTS DETECTED</div>
+            <div id="metric-objects" style="font-size: 15px; font-weight: 700; color: var(--accent-cyan);">127</div>
+            <div style="font-size: 8px; color: var(--text-muted);">Moving Candidates</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">VALID DEBRIS</div>
+            <div id="metric-debris" style="font-size: 15px; font-weight: 700; color: var(--accent-red);">8</div>
+            <div style="font-size: 8px; color: #F87171;">Track Confirmed</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">FALSE POSITIVES</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--accent-amber);">14</div>
+            <div style="font-size: 8px; color: #FCD34D;">Cosmic Rays Filtered</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">AI INFERENCE TIME</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--accent-violet);">3.8 ms</div>
+            <div style="font-size: 8px; color: #D8B4FE;">Coral Edge TPU INT8</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">TELEMETRY REDUCTION</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--accent-green);">>99.9%</div>
+            <div style="font-size: 8px; color: #6EE7B7;">2.3 MB &rarr; 180 Bytes</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">EDGE AI POWER</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--accent-cyan);">1.84 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">Sub-2W CubeSat Budget</div>
+          </div>
+
+          <div>
+            <div style="color: var(--text-muted); font-size: 9px;">TRACK CONFIDENCE</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--accent-green);">94.2%</div>
+            <div style="font-size: 8px; color: #6EE7B7;">Kalman Covariance Lock</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Center Multi-Panel Layout (SECTION 4) -->
+      <div style="display: grid; grid-template-columns: 280px 1fr 340px; gap: 12px; min-height: 520px;" class="main-grid-responsive">
+        
+        <!-- LEFT COLUMN: SATELLITE SYSTEM STATUS + 3D CUBESAT (SECTION 10) -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          
+          <!-- 3D 1U CubeSat Viewer (SECTION 10) -->
+          <div class="hud-card" style="padding: 10px; display: flex; flex-direction: column; height: 260px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: var(--font-mono);">
+                1U CUBESAT // 3D MODEL
+              </span>
+              <button class="hud-btn" style="padding: 1px 6px; font-size: 9px;" onclick="toggleCubeSatAutoRotate()">
+                <span id="rotate-toggle-text">AUTO-ROT: ON</span>
+              </button>
+            </div>
+            
+            <!-- Canvas for Interactive 3D Model -->
+            <div style="position: relative; flex: 1; background: var(--bg-secondary); border: 1px solid rgba(120, 160, 190, 0.1); border-radius: 2px; overflow: hidden;">
+              <canvas id="cubesat-canvas" width="260" height="190" style="width: 100%; height: 100%; cursor: grab;"></canvas>
+              
+              <!-- Labels Overlay -->
+              <div style="position: absolute; bottom: 4px; left: 6px; font-family: var(--font-mono); font-size: 8px; color: var(--accent-cyan); background: rgba(0,0,0,0.6); padding: 2px 4px; border-radius: 2px;">
+                FOV CONE: 28.4° &bull; OPTICAL AXIS +Z
+              </div>
+            </div>
+
+            <!-- Subsystem Callout Pills -->
+            <div style="display: flex; gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 8px; overflow-x: auto;">
+              <span style="background: rgba(0,240,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,240,255,0.3); padding: 1px 4px; border-radius: 2px;">IMX296 CAM</span>
+              <span style="background: rgba(168,85,247,0.1); color: var(--accent-violet); border: 1px solid rgba(168,85,247,0.3); padding: 1px 4px; border-radius: 2px;">CORAL TPU</span>
+              <span style="background: rgba(16,185,129,0.1); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); padding: 1px 4px; border-radius: 2px;">SOLAR 4.8W</span>
+              <span style="background: rgba(59,130,246,0.1); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); padding: 1px 4px; border-radius: 2px;">UHF AX.25</span>
+            </div>
+          </div>
+
+          <!-- Alert System Panel (SECTION 17) -->
+          <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 8px;">
+              <span style="color: var(--accent-red); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <span class="pulse-red"></span>
+                ACTIVE PROXIMITY ALERT
+              </span>
+              <span style="font-size: 9px; color: var(--accent-red); background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); padding: 1px 5px; border-radius: 2px;">
+                TRACKED
+              </span>
+            </div>
+            
+            <div id="alert-content" style="background: rgba(239, 68, 68, 0.08); border-left: 3px solid var(--accent-red); padding: 8px; border-radius: 0 3px 3px 0;">
+              <div style="font-weight: 700; color: #fff; margin-bottom: 2px;">TARGET D-017 &bull; HIGH MOTION DETECTED</div>
+              <div style="color: var(--text-secondary); font-size: 10px; margin-bottom: 6px;">
+                Relative angular rate 0.42°/s. Miss vector predicted at 2.99 km range.
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted);">
+                <span>CONFIDENCE: <strong style="color: var(--accent-green);">96.8%</strong></span>
+                <span>STATUS: <strong style="color: var(--accent-cyan);">KALMAN LOCKED</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Command Panel (SECTION 20) -->
+          <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px; flex: 1;">
+            <div style="font-weight: 700; color: #fff; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 8px;">
+              MISSION CONTROL COMMANDS
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <button class="hud-btn" onclick="sendCommand('CAPTURE')">CAPTURE FRAME</button>
+              <button class="hud-btn" onclick="sendCommand('INFERENCE')">RUN INFERENCE</button>
+              <button class="hud-btn" onclick="sendCommand('TRACK')">START TRACKING</button>
+              <button class="hud-btn" onclick="sendCommand('ROI')">EXTRACT RoI</button>
+              <button class="hud-btn" onclick="sendCommand('PACKET')">CREATE TELEM</button>
+              <button class="hud-btn" onclick="sendCommand('TRANSMIT')">TRANSMIT UHF</button>
+            </div>
+            <div id="command-feedback" style="margin-top: 8px; font-size: 9px; color: var(--accent-cyan); background: var(--bg-secondary); padding: 4px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+              READY FOR OPERATOR TELECOMMAND
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CENTER HERO: LIVE SPACE CAMERA + AI VISION (SECTION 5) -->
+        <div class="hud-card" style="padding: 12px; display: flex; flex-direction: column; min-height: 480px;">
+          
+          <!-- Camera Feed Header & Metadata -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="pulse-cyan"></span>
+              <strong style="color: #fff; letter-spacing: 0.5px;">OPTICAL PAYLOAD &bull; LIVE SPACE FEED</strong>
+              <span style="background: rgba(0,240,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,240,255,0.3); padding: 1px 6px; border-radius: 2px; font-size: 9px;">
+                GLOBAL SHUTTER 1440&times;1080 @ 30 FPS
+              </span>
+            </div>
+
+            <!-- Camera Mode Selector (SECTION 21) -->
+            <div style="display: flex; gap: 4px;">
+              <button class="hud-btn" data-cam-mode="RAW" onclick="setCamMode('RAW')">RAW</button>
+              <button class="hud-btn" data-cam-mode="FILTERED" onclick="setCamMode('FILTERED')">FILTERED</button>
+              <button class="hud-btn active" data-cam-mode="DETECTION" onclick="setCamMode('DETECTION')">DETECTION</button>
+              <button class="hud-btn" data-cam-mode="TRACKING" onclick="setCamMode('TRACKING')">TRACKING</button>
+              <button class="hud-btn" data-cam-mode="ROI" onclick="setCamMode('ROI')">ROI</button>
+            </div>
+          </div>
+
+          <!-- Camera Screen Canvas Container -->
+          <div style="position: relative; flex: 1; background: #000; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 2px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            <canvas id="camera-canvas" width="800" height="480" style="width: 100%; height: 100%; object-fit: contain; cursor: crosshair;"></canvas>
+            
+            <!-- Technical HUD Corner Brackets -->
+            <div style="position: absolute; top: 8px; left: 8px; width: 16px; height: 16px; border-top: 2px solid var(--accent-cyan); border-left: 2px solid var(--accent-cyan); pointer-events: none;"></div>
+            <div style="position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; border-top: 2px solid var(--accent-cyan); border-right: 2px solid var(--accent-cyan); pointer-events: none;"></div>
+            <div style="position: absolute; bottom: 8px; left: 8px; width: 16px; height: 16px; border-bottom: 2px solid var(--accent-cyan); border-left: 2px solid var(--accent-cyan); pointer-events: none;"></div>
+            <div style="position: absolute; bottom: 8px; right: 8px; width: 16px; height: 16px; border-bottom: 2px solid var(--accent-cyan); border-right: 2px solid var(--accent-cyan); pointer-events: none;"></div>
+
+            <!-- Camera Metadata Overlay (Bottom Left) -->
+            <div style="position: absolute; bottom: 12px; left: 14px; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,0.7); background: rgba(5,8,13,0.85); padding: 6px 10px; border: 1px solid var(--border-subtle); border-radius: 2px; pointer-events: none; line-height: 1.5;">
+              <div>FRAME: <span id="cam-frame-no" style="color: var(--accent-cyan); font-weight: 700;">00018427</span> | EXP: <span style="color: #fff;">12.4 ms</span> | GAIN: <span style="color: #fff;">18.2 dB</span></div>
+              <div style="font-size: 9px; color: var(--accent-green);">
+                &bull; STARFIELD FILTER: ACTIVE &bull; COSMIC RAY REJECTION: ACTIVE &bull; TEMPORAL DIFF: ACTIVE
+              </div>
+            </div>
+
+            <!-- Target Lock HUD Box (Top Right Overlay) -->
+            <div id="target-hud-box" style="position: absolute; top: 12px; right: 14px; font-family: var(--font-mono); font-size: 10px; background: rgba(5,8,13,0.85); padding: 8px 12px; border: 1px solid var(--accent-red); border-radius: 2px; pointer-events: none; line-height: 1.4; box-shadow: 0 0 15px rgba(239,68,68,0.3);">
+              <div style="color: var(--accent-red); font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+                <span>TARGET: D-017</span>
+                <span style="font-size: 9px; background: var(--accent-red); color: white; padding: 0 4px; border-radius: 2px;">DEBRIS</span>
+              </div>
+              <div style="color: #fff; margin-top: 2px;">CONFIDENCE: <strong style="color: var(--accent-green);">96.8%</strong></div>
+              <div style="color: var(--text-secondary);">MOTION: <span style="color: var(--accent-cyan);">DETECTED (0.42°/s)</span></div>
+              <div style="color: var(--text-secondary);">EST VEL: <span style="color: #fff;">7.42 m/s</span></div>
+              <div style="color: var(--text-secondary); font-size: 9px;">RA 184.32° &bull; DEC -12.81°</div>
+            </div>
+          </div>
+
+          <!-- Bottom Camera Strip -->
+          <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">
+            <div>FOV: 28.4° &times; 21.6° (35mm f/1.4 Lens) &bull; IFOV: 20.3 arcsec/pixel &bull; MONO12 RAW</div>
+            <div style="color: var(--accent-cyan);">EDGE-DEBRIS-INT8 V3 INFERENCE ACTIVE</div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: OBJECT CLASSIFICATION + 2D TRACKING RADAR (SECTIONS 8 & 9) -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          
+          <!-- Object Classification Panel (SECTION 8) -->
+          <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 6px;">
+              <span style="font-weight: 700; color: #fff;">AI OBJECT CLASSIFICATION</span>
+              <span style="font-size: 9px; color: var(--accent-cyan); background: rgba(0,240,255,0.1); padding: 1px 4px; border-radius: 2px;">
+                SOFTMAX PROBABILITIES
+              </span>
+            </div>
+
+            <!-- Aggregate Candidate Counts -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--bg-secondary); padding: 4px; border-radius: 2px; text-align: center; margin-bottom: 8px;">
+              <div>
+                <div style="font-size: 8px; color: var(--text-muted);">CANDIDATES</div>
+                <div style="font-size: 12px; font-weight: 700; color: #fff;">47</div>
+              </div>
+              <div>
+                <div style="font-size: 8px; color: var(--accent-red);">VALID DEBRIS</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--accent-red);">3</div>
+              </div>
+              <div>
+                <div style="font-size: 8px; color: var(--accent-amber);">FALSE POS</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--accent-amber);">41</div>
+              </div>
+              <div>
+                <div style="font-size: 8px; color: var(--accent-blue);">SUPPRESSED</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--accent-blue);">44</div>
+              </div>
+            </div>
+
+            <!-- Target Items List -->
+            <div id="targets-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto;">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+
+          <!-- 2D Debris Radar Tracking View (SECTION 9) -->
+          <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px; flex: 1; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 6px;">
+              <span style="font-weight: 700; color: #fff;">2D ORBITAL TRACKING RADAR</span>
+              <span style="font-size: 9px; color: var(--accent-green);">RANGE: 8.0 KM</span>
+            </div>
+
+            <!-- Radar Canvas -->
+            <div style="position: relative; flex: 1; background: var(--bg-secondary); border: 1px solid rgba(120, 160, 190, 0.1); border-radius: 2px; overflow: hidden; min-height: 180px;">
+              <canvas id="radar-canvas" width="300" height="220" style="width: 100%; height: 100%;"></canvas>
+            </div>
+
+            <!-- Selected Target Hill Vectors -->
+            <div id="radar-vector-info" style="margin-top: 6px; background: var(--bg-secondary); padding: 4px 6px; border-radius: 2px; font-size: 9px; color: var(--text-secondary); display: flex; justify-content: space-between;">
+              <span>TARGET: <strong style="color: var(--accent-red);">D-017</strong></span>
+              <span>ΔX: <strong style="color: var(--accent-cyan);">+2.31 km</strong> | ΔY: <strong style="color: var(--accent-cyan);">-1.72 km</strong></span>
+              <span>REL V: <strong style="color: #fff;">7.4 m/s</strong></span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bottom Row: Telemetry Packetization + Earth Downlink + Terminal Logs (SECTIONS 11, 12, 14) -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px; min-height: 250px;" class="bottom-grid-responsive">
+        
+        <!-- Telemetry Packetization Visualizer (SECTION 11) -->
+        <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 8px;">
+            <span style="font-weight: 700; color: #fff;">INTELLIGENT TELEMETRY PACKETIZATION</span>
+            <span style="font-size: 9px; color: var(--accent-green); background: rgba(16,185,129,0.1); padding: 1px 5px; border-radius: 2px;">
+              >99.9% DATA REDUCTION
+            </span>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; background: var(--bg-secondary); border-radius: 2px; padding: 10px; border: 1px solid var(--border-subtle);">
+            
+            <!-- Raw Image Box -->
+            <div style="text-align: center;">
+              <div style="width: 70px; height: 60px; background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); border-radius: 2px; margin: 0 auto 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px;">
+                <span style="color: #fff; font-weight: 700;">RAW IMAGE</span>
+                <span style="color: var(--accent-blue);">1920&times;1080</span>
+                <span style="color: var(--accent-blue); font-weight: 700;">2.3 MB</span>
+              </div>
+              <div style="font-size: 9px; color: var(--text-muted);">DISCARDED ONBOARD</div>
+            </div>
+
+            <!-- Compression Arrow -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+              <div style="font-size: 8px; color: var(--accent-violet); font-weight: 700;">EDGE-AI</div>
+              <div style="font-size: 8px; color: var(--accent-violet);">CORAL TPU</div>
+              <svg width="40" height="16" viewBox="0 0 40 16" fill="none">
+                <line x1="0" y1="8" x2="32" y2="8" stroke="var(--accent-violet)" stroke-width="2" stroke-dasharray="3 3"/>
+                <polygon points="32,4 40,8 32,12" fill="var(--accent-violet)"/>
+              </svg>
+              <div style="font-size: 8px; color: var(--accent-green); font-weight: 700;">-99.992%</div>
+            </div>
+
+            <!-- Telemetry Packet Card -->
+            <div style="text-align: center;">
+              <div style="width: 70px; height: 60px; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-green); border-radius: 2px; margin: 0 auto 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px;">
+                <span style="color: #fff; font-weight: 700;">TELEMETRY</span>
+                <span style="color: var(--accent-green);">JSON PACKET</span>
+                <span style="color: var(--accent-green); font-weight: 700;">180 BYTES</span>
+              </div>
+              <div style="font-size: 9px; color: var(--accent-green);">UHF AX.25 QUEUE</div>
+            </div>
+
+          </div>
+
+          <!-- Decoded JSON Fields Display -->
+          <div style="margin-top: 8px; background: rgba(0,0,0,0.5); padding: 6px; border-radius: 2px; font-size: 9px; color: var(--text-secondary); line-height: 1.4;">
+            <span style="color: var(--text-muted); font-size: 8px;">SAMPLE TRANSMITTED TELEMETRY PAYLOAD:</span>
+            <div style="color: var(--accent-cyan);">{"id":"D-017","cls":"DEBRIS","conf":0.968,"ra":184.32,"dec":-12.81,"ang_rate":0.42,"roi":"64x64"}</div>
+          </div>
+        </div>
+
+        <!-- Earth Downlink Visualization (SECTION 12) -->
+        <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 8px;">
+            <span style="font-weight: 700; color: #fff;">EARTH DOWNLINK & GROUND STATION</span>
+            <span style="font-size: 9px; color: var(--accent-blue);">UHF / S-BAND</span>
+          </div>
+
+          <!-- Downlink Canvas (Earth Globe + Downlink Beam) -->
+          <div style="position: relative; flex: 1; background: var(--bg-secondary); border-radius: 2px; overflow: hidden; border: 1px solid var(--border-subtle); min-height: 110px;">
+            <canvas id="downlink-canvas" width="280" height="110" style="width: 100%; height: 100%;"></canvas>
+            
+            <div style="position: absolute; top: 4px; left: 6px; font-size: 8px; color: var(--accent-cyan); background: rgba(0,0,0,0.6); padding: 1px 4px; border-radius: 2px;">
+              GS: BENGALURU, INDIA (12.97° N, 77.59° E)
+            </div>
+          </div>
+
+          <!-- Link Statistics Strip -->
+          <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; font-size: 9px;">
+            <div style="background: var(--bg-secondary); padding: 3px; border-radius: 2px;">
+              <span style="color: var(--text-muted);">SIGNAL:</span> <strong style="color: var(--accent-green);">-62 dBm</strong>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 3px; border-radius: 2px;">
+              <span style="color: var(--text-muted);">PKT LOSS:</span> <strong style="color: var(--accent-green);">0.3%</strong>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 3px; border-radius: 2px;">
+              <span style="color: var(--text-muted);">LATENCY:</span> <strong style="color: #fff;">142 ms</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time System Log Terminal (SECTION 14) -->
+        <div class="hud-card" style="padding: 10px; font-family: var(--font-mono); font-size: 11px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="pulse-green"></span>
+              <span style="font-weight: 700; color: #fff;">ONBOARD EVENT & SYSTEM LOGS</span>
+            </div>
+            <span style="font-size: 9px; color: var(--accent-cyan);">AUTO-SCROLL</span>
+          </div>
+
+          <!-- Log Stream Container -->
+          <div id="system-logs-container" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 6px; overflow-y: auto; font-size: 10px; display: flex; flex-direction: column; gap: 3px; max-height: 180px;">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Horizontal Mission Timeline (SECTION 16) -->
+      <section class="hud-card" style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: 700;">ONBOARD EDGE PIPELINE TIMELINE &bull; CLICK STAGE TO INSPECT ARCHITECTURE:</span>
+          <span style="font-size: 9px; color: var(--accent-cyan);">END-TO-END EXECUTION: ~34 MS</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; overflow-x: auto; padding-bottom: 4px;" id="timeline-stages">
+          <!-- Dynamically generated via JS -->
+        </div>
+
+        <!-- Stage Inspector Description Drawer -->
+        <div id="stage-inspector" style="margin-top: 8px; background: var(--bg-secondary); border-left: 3px solid var(--accent-cyan); padding: 6px 12px; font-size: 10px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+          <span id="stage-inspector-desc">CLICK ANY STAGE ABOVE TO VIEW HARDWARE ALLOCATION, OPS, AND TIMING.</span>
+          <span id="stage-inspector-hw" style="color: var(--accent-cyan); font-weight: 700;">CORAL EDGE TPU // IMX296</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- TAB 2: CAMERA & BEFORE/AFTER FILTER (SECTION 6) -->
+    <div id="tab-camera" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <!-- Before / After Filter Side-by-Side (SECTION 6) -->
+      <div class="hud-card" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 14px;">
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700; color: #fff; font-family: var(--font-mono);">
+              BEFORE / AFTER EDGE-AI FILTERING VISUALIZATION
+            </h2>
+            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+              RAW OPTICAL DATA &rarr; EDGE PRE-PROCESSING &rarr; CLEANED MOVING DEBRIS FRAME
+            </p>
+          </div>
+
+          <!-- 4 Filter Indicators (SECTION 6) -->
+          <div style="display: flex; gap: 8px; font-family: var(--font-mono); font-size: 10px; flex-wrap: wrap;">
+            <span style="background: rgba(16,185,129,0.1); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 2px;">
+              &bull; STAR SUPPRESSION: ACTIVE
+            </span>
+            <span style="background: rgba(16,185,129,0.1); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 2px;">
+              &bull; COSMIC-RAY REJECTION: ACTIVE
+            </span>
+            <span style="background: rgba(0,240,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,240,255,0.3); padding: 3px 8px; border-radius: 2px;">
+              &bull; TEMPORAL DIFFERENCING: ACTIVE
+            </span>
+            <span style="background: rgba(16,185,129,0.1); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 2px;">
+              &bull; NOISE REDUCTION: ACTIVE
+            </span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          
+          <!-- LEFT: RAW FRAME -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-family: var(--font-mono); font-size: 11px;">
+              <span style="color: var(--accent-amber); font-weight: 700;">RAW OPTICAL FRAME (SENSOR NOISE + STARS + COSMIC RAYS)</span>
+              <span style="color: var(--text-muted);">MONO12 RAW 2.3 MB</span>
+            </div>
+            <div style="position: relative; height: 380px; background: #000; border: 1px solid #334155; border-radius: 2px; overflow: hidden;">
+              <canvas id="raw-canvas" width="600" height="380" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
+              <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); font-family: var(--font-mono); font-size: 9px; color: var(--accent-amber); padding: 2px 6px;">
+                CONTAINS: Dense Starfield, Thermal Hot Pixels, Cosmic Ray Ionization Streaks
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: FILTERED FRAME -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-highlight); border-radius: 3px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-family: var(--font-mono); font-size: 11px;">
+              <span style="color: var(--accent-cyan); font-weight: 700;">CLEANED FRAME &bull; ISOLATED MOVING DEBRIS ONLY</span>
+              <span style="color: var(--accent-green); font-weight: 700;">TARGET D-017 ISOLATED</span>
+            </div>
+            <div style="position: relative; height: 380px; background: #000; border: 1px solid rgba(0,240,255,0.4); border-radius: 2px; overflow: hidden;">
+              <canvas id="filtered-canvas" width="600" height="380" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
+              <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); font-family: var(--font-mono); font-size: 9px; color: var(--accent-cyan); padding: 2px 6px;">
+                BACKGROUND CANCELLED: 44 Stars Suppressed, 14 Cosmic Rays Rejected
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 3: EDGE AI INFERENCE & PROCESSING (SECTION 7) -->
+    <div id="tab-edge-ai" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        
+        <!-- Vertical Pipeline (SECTION 7) -->
+        <div class="hud-card" style="padding: 16px; font-family: var(--font-mono);">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; margin-bottom: 12px;">
+            <div>
+              <h3 style="font-size: 14px; font-weight: 700; color: #fff;">EDGE-AI ONBOARD EXECUTION SEQUENCE</h3>
+              <p style="font-size: 10px; color: var(--text-muted);">PULSING DATA TRAVEL THROUGH ONBOARD LAYERS</p>
+            </div>
+            <span style="font-size: 9px; color: var(--accent-violet); background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.4); padding: 2px 6px; border-radius: 2px;">
+              INT8 QUANTIZED
+            </span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;" id="ai-pipeline-steps">
+            <!-- Dynamically generated pipeline steps -->
+          </div>
+        </div>
+
+        <!-- Hardware & Accelerator Metrics (SECTION 7) -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          
+          <div class="hud-card" style="padding: 16px; font-family: var(--font-mono); font-size: 11px;">
+            <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+              EDGE HARDWARE & ACCELERATOR TELEMETRY
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+                <div style="color: var(--text-muted); font-size: 9px;">NEURAL ACCELERATOR</div>
+                <div style="color: var(--accent-cyan); font-weight: 700; font-size: 13px;">Google Coral Edge TPU</div>
+                <div style="color: var(--text-secondary); font-size: 9px; margin-top: 2px;">4.0 TOPS INT8 &bull; 0.5W / TOPS</div>
+              </div>
+
+              <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+                <div style="color: var(--text-muted); font-size: 9px;">MODEL ARCHITECTURE</div>
+                <div style="color: var(--accent-violet); font-weight: 700; font-size: 13px;">EDGE-DEBRIS-INT8</div>
+                <div style="color: var(--text-secondary); font-size: 9px; margin-top: 2px;">MobileNetV3 Tiny &bull; Size: ~8.4 MB</div>
+              </div>
+
+              <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+                <div style="color: var(--text-muted); font-size: 9px;">HOST OBC PROCESSOR</div>
+                <div style="color: #fff; font-weight: 700; font-size: 13px;">Raspberry Pi CM4 Lite</div>
+                <div style="color: var(--text-secondary); font-size: 9px; margin-top: 2px;">Quad Cortex-A72 @ 1.5 GHz</div>
+              </div>
+
+              <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+                <div style="color: var(--text-muted); font-size: 9px;">OPTICAL SENSOR</div>
+                <div style="color: var(--accent-green); font-weight: 700; font-size: 13px;">Sony IMX296 Mono</div>
+                <div style="color: var(--text-secondary); font-size: 9px; margin-top: 2px;">Global Shutter &bull; 1440&times;1080 @ 30fps</div>
+              </div>
+            </div>
+
+            <!-- Resource Usage Progress Bars (SECTION 7) -->
+            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+                  <span style="color: var(--text-muted);">CPU LOAD:</span>
+                  <span style="color: var(--accent-cyan); font-weight: 700;">42%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #1E293B; border-radius: 2px; overflow: hidden;">
+                  <div style="width: 42%; height: 100%; background: var(--accent-cyan);"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+                  <span style="color: var(--text-muted);">NPU/ACCELERATOR LOAD:</span>
+                  <span style="color: var(--accent-violet); font-weight: 700;">67%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #1E293B; border-radius: 2px; overflow: hidden;">
+                  <div style="width: 67%; height: 100%; background: var(--accent-violet);"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+                  <span style="color: var(--text-muted);">RAM UTILIZATION:</span>
+                  <span style="color: var(--accent-blue); font-weight: 700;">61% (1.22 GB / 2.0 GB)</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #1E293B; border-radius: 2px; overflow: hidden;">
+                  <div style="width: 61%; height: 100%; background: var(--accent-blue);"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+                  <span style="color: var(--text-muted);">PIPELINE FPS:</span>
+                  <span style="color: var(--accent-green); font-weight: 700;">26.4 FPS</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #1E293B; border-radius: 2px; overflow: hidden;">
+                  <div style="width: 88%; height: 100%; background: var(--accent-green);"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="hud-card" style="padding: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">
+            <div style="color: var(--accent-cyan); font-weight: 700; margin-bottom: 4px;">KEY TECHNICAL INNOVATION:</div>
+            Onboard temporal differencing cancels static starfields in hardware before passing candidates to the Coral Edge TPU. This reduces inference invocation rate by 94%, maintaining CubeSat total thermal power under 1.84 Watts.
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 4: DEBRIS TRACKING VIEW (SECTION 9) -->
+    <div id="tab-tracking" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <div class="hud-card" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 14px;">
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700; color: #fff; font-family: var(--font-mono);">
+              HILL-FRAME RELATIVE ORBITAL ASTROMETRY & TRACKING
+            </h2>
+            <p style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+              6-STATE EXTENDED KALMAN FILTER (EKF) PROPAGATION IN J2000 INERTIAL COORDINATES
+            </p>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-green);">
+            ● KALMAN RECURSION ACTIVE (Q=1e-5, R=0.08 px)
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 12px; min-height: 420px; position: relative;">
+            <canvas id="large-radar-canvas" width="640" height="420" style="width: 100%; height: 100%;"></canvas>
+          </div>
+
+          <!-- Target Ephemeris Table -->
+          <div style="display: flex; flex-direction: column; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
+            <div style="font-weight: 700; color: #fff; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+              ACTIVE TARGET STATE VECTORS
+            </div>
+
+            <div style="background: var(--bg-secondary); border: 1px solid rgba(239,68,68,0.3); border-radius: 2px; padding: 8px;">
+              <div style="display: flex; justify-content: space-between; color: var(--accent-red); font-weight: 700; margin-bottom: 4px;">
+                <span>TARGET D-017 [DEBRIS]</span>
+                <span>CONF: 96.8%</span>
+              </div>
+              <div style="font-size: 10px; color: var(--text-secondary); line-height: 1.6;">
+                <div>ΔX (Radial): <strong style="color: #fff;">+2.31 km</strong></div>
+                <div>ΔY (In-track): <strong style="color: #fff;">-1.72 km</strong></div>
+                <div>ΔZ (Cross-track): <strong style="color: #fff;">+0.84 km</strong></div>
+                <div>RANGE: <strong style="color: var(--accent-cyan);">2.99 km</strong></div>
+                <div>REL VELOCITY: <strong style="color: #fff;">7.42 m/s</strong></div>
+                <div>ANGULAR RATE: <strong style="color: var(--accent-amber);">0.42°/s</strong></div>
+                <div>APPARENT MAG: <strong style="color: #fff;">8.14 M</strong></div>
+              </div>
+            </div>
+
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 8px;">
+              <div style="display: flex; justify-content: space-between; color: var(--accent-red); font-weight: 700; margin-bottom: 4px;">
+                <span>TARGET D-018 [DEBRIS]</span>
+                <span>CONF: 91.3%</span>
+              </div>
+              <div style="font-size: 10px; color: var(--text-secondary); line-height: 1.6;">
+                <div>ΔX (Radial): <strong style="color: #fff;">-4.12 km</strong></div>
+                <div>ΔY (In-track): <strong style="color: #fff;">+3.55 km</strong></div>
+                <div>ΔZ (Cross-track): <strong style="color: #fff;">-1.18 km</strong></div>
+                <div>RANGE: <strong style="color: var(--accent-cyan);">5.56 km</strong></div>
+                <div>REL VELOCITY: <strong style="color: #fff;">6.88 m/s</strong></div>
+                <div>ANGULAR RATE: <strong style="color: var(--accent-amber);">0.28°/s</strong></div>
+                <div>APPARENT MAG: <strong style="color: #fff;">9.35 M</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 5: TELEMETRY & PACKET TRANSMISSION (SECTION 11) -->
+    <div id="tab-telemetry" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <div class="hud-card" style="padding: 16px; font-family: var(--font-mono);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 14px;">
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700; color: #fff;">
+              TELEMETRY PACKET STREAM & AX.25 UHF DOWNLINK
+            </h2>
+            <p style="font-size: 11px; color: var(--text-muted);">
+              INTELLIGENT COMPRESSION SAVES >99.9% RADIO BANDWIDTH & POWER
+            </p>
+          </div>
+          <span style="font-size: 10px; color: var(--accent-green); background: rgba(16,185,129,0.15); padding: 3px 8px; border-radius: 2px;">
+            AX.25 9.6 KBPS &bull; 437.450 MHZ
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          
+          <!-- Packet Table -->
+          <div>
+            <div style="font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+              RECENT TRANSMITTED EVENT PACKETS
+            </div>
+            <div id="telemetry-table-container" style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 8px; max-height: 380px; overflow-y: auto;">
+              <!-- Table injected via JS -->
+            </div>
+          </div>
+
+          <!-- Hex & Decoded Packet Inspector -->
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 12px; font-weight: 700; color: #fff;">
+              PACKET PAYLOAD INSPECTOR (PACKET #10842)
+            </div>
+            
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 10px; font-size: 10px; color: var(--accent-cyan); line-height: 1.5;">
+              <div style="color: var(--text-muted); margin-bottom: 4px;">RAW AX.25 FRAME (HEX DUMP):</div>
+              7E 82 84 86 88 40 E0 98 92 68 84 40 61 03 F0 7B 22 74 61 72 67 65 74 22 3A 22 44 2D 30 31 37 22 2C 22 72 61 22 3A 31 38 34 2E 33 32 2C 22 64 65 63 22 3A 2D 31 32 2E 38 31 2C 22 76 65 6C 22 3A 37 2E 34 7D 5B 8F 7E
+            </div>
+
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 10px; font-size: 10px; color: #fff; line-height: 1.5;">
+              <div style="color: var(--text-muted); margin-bottom: 4px;">DECODED JSON TELEMETRY (178 BYTES):</div>
+              <pre style="color: var(--accent-green); overflow-x: auto;">
+{
+  "packet_id": 10842,
+  "timestamp_utc": "12:42:17.139Z",
+  "cubesat": "BX-01",
+  "target_id": "D-017",
+  "classification": "SPACE_DEBRIS",
+  "confidence": 0.968,
+  "astrometry": {
+    "ra_deg": 184.32,
+    "dec_deg": -12.81,
+    "angular_rate_deg_s": 0.42
+  },
+  "hill_vector": {
+    "dx_km": 2.31,
+    "dy_km": -1.72,
+    "dz_km": 0.84,
+    "rel_v_m_s": 7.42
+  },
+  "roi_tile_bytes": 128
+}</pre>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 6: POWER MONITORING (SECTION 13) -->
+    <div id="tab-power" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <div class="hud-card" style="padding: 16px; font-family: var(--font-mono);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 14px;">
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700; color: #fff;">
+              ELECTRICAL POWER SUBSYSTEM (EPS) LIVE MONITORING
+            </h2>
+            <p style="font-size: 11px; color: var(--text-muted);">
+              SOLAR HARVESTING VS ONBOARD EDGE-AI CONSUMPTION (1U BUDGET: &lt; 5.0 W)
+            </p>
+          </div>
+          <span style="font-size: 10px; color: var(--accent-green); background: rgba(16,185,129,0.15); padding: 3px 8px; border-radius: 2px;">
+            ENERGY POSITIVE: +1.07 W NET MARGIN
+          </span>
+        </div>
+
+        <!-- Power Metrics Matrix (SECTION 13) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px;">
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+            <div style="color: var(--text-muted); font-size: 9px;">SOLAR INPUT</div>
+            <div id="pwr-solar" style="font-size: 16px; font-weight: 700; color: var(--accent-green);">4.82 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">GaAs Solar Arrays</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+            <div style="color: var(--text-muted); font-size: 9px;">EDGE AI (TPU)</div>
+            <div id="pwr-ai" style="font-size: 16px; font-weight: 700; color: var(--accent-violet);">1.84 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">Inference Active</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+            <div style="color: var(--text-muted); font-size: 9px;">CAMERA (IMX296)</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">0.72 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">60ms Global Shutter</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+            <div style="color: var(--text-muted); font-size: 9px;">OBC PROCESSING</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--accent-blue);">0.88 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">CM4 4-Core A72</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid var(--border-subtle);">
+            <div style="color: var(--text-muted); font-size: 9px;">TELEMETRY (UHF)</div>
+            <div style="font-size: 16px; font-weight: 700; color: #fff;">0.31 W</div>
+            <div style="font-size: 8px; color: var(--text-muted);">AX.25 Transmitter</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 10px; border-radius: 2px; border: 1px solid rgba(0,240,255,0.3);">
+            <div style="color: var(--text-muted); font-size: 9px;">SYSTEM TOTAL</div>
+            <div id="pwr-total" style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">3.75 W</div>
+            <div style="font-size: 8px; color: var(--accent-green);">Within 1U Envelope</div>
+          </div>
+        </div>
+
+        <!-- Live Power Graph Canvas (SECTION 13) -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 12px; height: 320px; position: relative;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px;">
+            <span style="color: #fff; font-weight: 700;">POWER HARVESTING VS CONSUMPTION WAVEFORM</span>
+            <div style="display: flex; gap: 12px;">
+              <span style="color: var(--accent-green);">&bull; Solar Generation (W)</span>
+              <span style="color: var(--accent-cyan);">&bull; Total Load (W)</span>
+              <span style="color: var(--accent-amber);">&bull; Battery State (%)</span>
+            </div>
+          </div>
+          <canvas id="power-canvas" width="800" height="270" style="width: 100%; height: 270px;"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 7: SYSTEM LOGS (SECTION 14) -->
+    <div id="tab-logs" class="tab-content" style="display: none; flex-direction: column; gap: 12px;">
+      
+      <div class="hud-card" style="padding: 16px; font-family: var(--font-mono); flex: 1; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h2 style="font-size: 16px; font-weight: 700; color: #fff;">
+              FULL ONBOARD TELECOMMAND & EVENT LOG STREAM
+            </h2>
+            <p style="font-size: 11px; color: var(--text-muted);">
+              FLIGHT COMPUTER AUDIT TRAIL // REAL-TIME KERNEL & PAYLOAD LOGS
+            </p>
+          </div>
+          
+          <div style="display: flex; gap: 6px;">
+            <button class="hud-btn active" onclick="filterLogs('ALL')">ALL</button>
+            <button class="hud-btn" onclick="filterLogs('OPTICAL')">OPTICAL</button>
+            <button class="hud-btn" onclick="filterLogs('FILTER')">FILTER</button>
+            <button class="hud-btn" onclick="filterLogs('AI')">AI</button>
+            <button class="hud-btn" onclick="filterLogs('TRACK')">TRACK</button>
+            <button class="hud-btn" onclick="filterLogs('TELEMETRY')">TELEMETRY</button>
+            <button class="hud-btn" onclick="filterLogs('WARN')">WARN</button>
+          </div>
+        </div>
+
+        <div id="full-logs-container" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 2px; padding: 10px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 4px; min-height: 480px;">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- PERSISTENT FOOTER & DEMO DISCLOSURE (SECTIONS 26 & 27) -->
+  <!-- ========================================== -->
+  <footer style="background: var(--bg-surface); border-top: 1px solid var(--border-subtle); padding: 8px 16px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;">
+      
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="color: var(--accent-cyan); font-weight: 700; letter-spacing: 1px;">
+          "ONBOARD EDGE INTELLIGENCE &bull; DETECT &bull; TRACK &bull; TRANSMIT ONLY WHAT MATTERS"
+        </span>
+      </div>
+
+      <!-- Demo Mode Disclosure (SECTION 27) -->
+      <div style="display: flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 2px;">
+        <span class="pulse-cyan" style="background-color: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber);"></span>
+        <span style="color: var(--accent-amber); font-weight: 600;">
+          SIMULATION MODE &bull; ALL TELEMETRY VALUES ARE DEMONSTRATION DATA FOR SIH 2026 PROTOTYPE
+        </span>
+      </div>
+
+      <div style="color: var(--text-secondary);">
+        1U CUBESAT (10&times;10&times;11.35 CM) &bull; MASS: 1.28 KG &bull; LEO SSO 520 KM
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- ========================================== -->
+  <!-- SOUND SYNTHESIZER & JAVASCRIPT APPLICATION -->
+  <!-- ========================================== -->
+  <script>
+    // --- STATE MANAGEMENT ---
+    let isRunning = true;
+    let simSpeed = 1;
+    let activeTab = 'OVERVIEW';
+    let cameraMode = 'DETECTION';
+    let frameCount = 18427;
+    let selectedTargetId = 'D-017';
+    let isEventSimulating = false;
+    let autoRotateCubeSat = true;
+
+    // --- AUDIO EFFECTS (WEB AUDIO API) ---
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    function playBeep(freq = 880, duration = 0.08, type = 'sine') {
+      try {
+        if (!audioCtx) audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    // --- TARGETS DATA ---
+    let targets = [
+      {
+        id: 'D-017',
+        type: 'DEBRIS',
+        confidence: 96.8,
+        angularRate: 0.42,
+        relativePosition: { dx: 2.31, dy: -1.72, dz: 0.84, range: 2.99 },
+        relativeVelocity: 7.42,
+        x: 0.62,
+        y: 0.38,
+        streakLength: 26,
+        streakAngle: -35,
+        history: [{ x: 0.52, y: 0.45 }, { x: 0.55, y: 0.43 }, { x: 0.58, y: 0.41 }, { x: 0.62, y: 0.38 }],
+        predicted: [{ x: 0.66, y: 0.35 }, { x: 0.70, y: 0.32 }, { x: 0.74, y: 0.29 }],
+        ra: 184.32,
+        dec: -12.81,
+        mag: 8.14,
+        status: 'TRACKING'
+      },
+      {
+        id: 'D-018',
+        type: 'DEBRIS',
+        confidence: 91.3,
+        angularRate: 0.28,
+        relativePosition: { dx: -4.12, dy: 3.55, dz: -1.18, range: 5.56 },
+        relativeVelocity: 6.88,
+        x: 0.28,
+        y: 0.65,
+        streakLength: 18,
+        streakAngle: 42,
+        history: [{ x: 0.22, y: 0.58 }, { x: 0.25, y: 0.62 }, { x: 0.28, y: 0.65 }],
+        predicted: [{ x: 0.32, y: 0.69 }, { x: 0.36, y: 0.73 }],
+        ra: 142.15,
+        dec: 24.62,
+        mag: 9.35,
+        status: 'TRACKING'
+      },
+      {
+        id: 'S-041',
+        type: 'STAR',
+        confidence: 99.1,
+        angularRate: 0.01,
+        relativePosition: { dx: 0, dy: 0, dz: 0, range: 9999 },
+        relativeVelocity: 0.0,
+        x: 0.82,
+        y: 0.22,
+        streakLength: 2,
+        streakAngle: 0,
+        history: [],
+        predicted: [],
+        ra: 215.11,
+        dec: -45.02,
+        mag: 5.42,
+        status: 'SUPPRESSED'
+      },
+      {
+        id: 'N-008',
+        type: 'NOISE',
+        confidence: 87.4,
+        angularRate: 0.0,
+        relativePosition: { dx: 0, dy: 0, dz: 0, range: 0 },
+        relativeVelocity: 0.0,
+        x: 0.45,
+        y: 0.82,
+        streakLength: 3,
+        streakAngle: 90,
+        history: [],
+        predicted: [],
+        ra: 190.4,
+        dec: -5.1,
+        mag: 11.2,
+        status: 'SUPPRESSED'
+      }
+    ];
+
+    // --- LOGS ---
+    let systemLogs = [
+      { ts: '12:42:17.021', cat: 'OPTICAL', msg: 'FRAME #00018427 CAPTURED [IMX296 1440x1080 @ 60ms]', lvl: 'INFO' },
+      { ts: '12:42:17.060', cat: 'FILTER', msg: 'STARFIELD TEMPORAL DIFFERENCE ACTIVE: 44 STARS SUPPRESSED', lvl: 'SUCCESS' },
+      { ts: '12:42:17.071', cat: 'AI', msg: 'MOVING OBJECT CANDIDATE DETECTED IN CAMERA ROIS', lvl: 'WARN' },
+      { ts: '12:42:17.109', cat: 'AI', msg: 'TARGET D-017 CLASSIFIED [SPACE_DEBRIS 96.8% INT8]', lvl: 'ALERT' },
+      { ts: '12:42:17.115', cat: 'TRACK', msg: 'SUB-PIXEL CENTROID RESOLVED: [612.4, 401.8] | J2000 ASTROMETRY LOCKED', lvl: 'INFO' },
+      { ts: '12:42:17.130', cat: 'TRACK', msg: 'TRAJECTORY UPDATED: HILL VECTOR ΔX=+2.31km ΔY=-1.72km REL_V=7.4m/s', lvl: 'INFO' },
+      { ts: '12:42:17.134', cat: 'TELEMETRY', msg: '64x64 ROI EXTRACTED | 2.3 MB RAW FRAME DISCARDED (>99% REDUCTION)', lvl: 'SUCCESS' },
+      { ts: '12:42:17.139', cat: 'TELEMETRY', msg: 'TELEMETRY PACKET #10842 CREATED (178 BYTES JSON)', lvl: 'INFO' },
+      { ts: '12:42:17.145', cat: 'TELEMETRY', msg: 'DOWNLINK QUEUED ON UHF AX.25 GATED PACKET BUFFER', lvl: 'SUCCESS' }
+    ];
+
+    function addLog(cat, msg, lvl = 'INFO') {
+      const now = new Date();
+      const ts = `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')}:${now.getUTCSeconds().toString().padStart(2, '0')}.${now.getUTCMilliseconds().toString().padStart(3, '0')}`;
+      systemLogs.unshift({ ts, cat, msg, lvl });
+      if (systemLogs.length > 80) systemLogs.pop();
+      renderLogs();
+    }
+
+    // --- PIPELINE STAGES DEFINITION ---
+    const PIPELINE_STAGES = [
+      { id: 'CAPTURE', label: '1. SENSOR CAPTURE', ops: '1440x1080 Mono12', time: '12.4 ms', hw: 'Sony IMX296 Global Shutter', desc: 'Hardware MIPI-CSI2 direct circular DMA ring buffer capture at 30 fps.' },
+      { id: 'FILTER', label: '2. PRE-PROCESSING', ops: '44 Stars Removed', time: '4.8 ms', hw: 'FPGA/Hardware Accel', desc: 'Starfield catalogue cancellation, cosmic ray morphological filtering, and thermal hot-pixel removal.' },
+      { id: 'DETECT', label: '3. OBJECT DETECTION', ops: 'Δt=3 Difference', time: '6.2 ms', hw: 'Raspberry Pi CM4 A72', desc: 'Inter-frame optical flux differencing detects moving streak candidates while suppressing static background.' },
+      { id: 'CLASSIFY', label: '4. EDGE-AI INFERENCE', ops: 'INT8 DebrisNet', time: '3.8 ms', hw: 'Coral Edge TPU (4 TOPS)', desc: 'Quantized MobileNetV3 debris classifier discriminates active debris from sensor artifacts and stars.' },
+      { id: 'CENTROID', label: '5. SUB-PIXEL CENTROID', ops: '±0.08 px Fit', time: '2.1 ms', hw: 'Host DSP Vector Unit', desc: 'Gaussian Point Spread Function (PSF) curve fitting computes center of mass with sub-pixel precision.' },
+      { id: 'TRACK', label: '6. TRAJECTORY EST.', ops: '6-State EKF Orbit', time: '3.4 ms', hw: 'Extended Kalman Filter', desc: 'Astrometric calibration (RA/Dec) and covariance matrix propagation estimate orbital miss vectors.' },
+      { id: 'PACKETIZE', label: '7. PACKETIZATION', ops: '2.3MB → 180 Bytes', time: '1.2 ms', hw: 'Onboard JSON Serializer', desc: 'Discards 99.98% empty starfield, compresses 64x64 RoI tile and state metadata into small telemetry packet.' },
+      { id: 'DOWNLINK', label: '8. AX.25 DOWNLINK', ops: '9.6 kbps Radio', time: '0.8 ms', hw: 'UHF AX.25 Transceiver', desc: 'Event packet queued and broadcast to ground station only when significant detection occurs.' }
+    ];
+
+    // --- TAB SWITCHING ---
+    function switchTab(tabId) {
+      activeTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('nav .hud-btn').forEach(btn => {
+        if (btn.innerText.includes(tabId.replace('_', ' '))) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      const targetEl = document.getElementById(`tab-${tabId.toLowerCase().replace('_', '-')}`);
+      if (targetEl) targetEl.style.display = 'flex';
+      playBeep(620, 0.04);
+    }
+
+    // --- SIMULATION SPEED & PAUSE ---
+    function setSpeed(s) {
+      simSpeed = s;
+      document.querySelectorAll('[data-speed]').forEach(b => {
+        if (Number(b.dataset.speed) === s) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+      playBeep(740, 0.05);
+    }
+
+    function togglePause() {
+      isRunning = !isRunning;
+      document.getElementById('pause-icon').innerText = isRunning ? '⏸' : '▶';
+      document.getElementById('pause-text').innerText = isRunning ? 'PAUSE' : 'RESUME';
+      document.getElementById('btn-play-pause').classList.toggle('active', !isRunning);
+      playBeep(520, 0.06);
+    }
+
+    function toggleCubeSatAutoRotate() {
+      autoRotateCubeSat = !autoRotateCubeSat;
+      document.getElementById('rotate-toggle-text').innerText = autoRotateCubeSat ? 'AUTO-ROT: ON' : 'AUTO-ROT: OFF';
+      playBeep(600, 0.04);
+    }
+
+    function setCamMode(mode) {
+      cameraMode = mode;
+      document.querySelectorAll('[data-cam-mode]').forEach(b => {
+        if (b.dataset.camMode === mode) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+      addLog('OPTICAL', `CAMERA DISPLAY MODE SWITCHED TO: [${mode}]`, 'INFO');
+      playBeep(700, 0.04);
+    }
+
+    // --- COMMAND PANEL ACTIONS ---
+    function sendCommand(cmd) {
+      const feedback = document.getElementById('command-feedback');
+      playBeep(920, 0.06);
+
+      switch (cmd) {
+        case 'CAPTURE':
+          frameCount++;
+          document.getElementById('cam-frame-no').innerText = String(frameCount).padStart(8, '0');
+          feedback.innerText = 'COMMAND EXECUTED: OPTICAL FRAME CAPTURED';
+          addLog('OPTICAL', 'MANUAL TELECOMMAND: IMX296 FRAME EXPOSURE TRIGGERED', 'INFO');
+          break;
+        case 'INFERENCE':
+          feedback.innerText = 'COMMAND EXECUTED: CORAL TPU INFERENCE RUN (3.8 ms)';
+          addLog('AI', 'MANUAL TELECOMMAND: CORAL TPU INT8 INFERENCE INITIATED', 'SUCCESS');
+          break;
+        case 'TRACK':
+          cameraMode = 'TRACKING';
+          setCamMode('TRACKING');
+          feedback.innerText = 'COMMAND EXECUTED: KALMAN TRACKING ENGAGED';
+          addLog('TRACK', 'MANUAL TELECOMMAND: KALMAN FILTER CONTINUOUS TRACKING ACTIVE', 'INFO');
+          break;
+        case 'ROI':
+          cameraMode = 'ROI';
+          setCamMode('ROI');
+          feedback.innerText = 'COMMAND EXECUTED: 64x64 RoI TILE EXTRACTED';
+          addLog('TELEMETRY', 'MANUAL TELECOMMAND: REGION OF INTEREST (RoI) TILE CROPPED', 'INFO');
+          break;
+        case 'PACKET':
+          feedback.innerText = 'COMMAND EXECUTED: TELEMETRY PACKET CONSTRUCTED';
+          addLog('TELEMETRY', 'MANUAL TELECOMMAND: 178-BYTE EVENT PACKET SERIALIZED', 'SUCCESS');
+          break;
+        case 'TRANSMIT':
+          feedback.innerText = 'COMMAND EXECUTED: UHF AX.25 DOWNLINK SENT';
+          addLog('TELEMETRY', 'MANUAL TELECOMMAND: PACKET DOWNLINKED TO BENGALURU GROUND STATION', 'SUCCESS');
+          break;
+      }
+    }
+
+    // ==========================================
+    // "SIMULATE DEBRIS EVENT" (SECTION 19)
+    // ==========================================
+    document.getElementById('btn-trigger-event').addEventListener('click', () => {
+      if (isEventSimulating) return;
+      isEventSimulating = true;
+
+      const progressContainer = document.getElementById('event-progress-bar-container');
+      const progressFill = document.getElementById('event-progress-fill');
+      progressContainer.style.display = 'block';
+      progressFill.style.width = '0%';
+
+      const eventTargetId = `D-0${Math.floor(Math.random() * 70 + 25)}`;
+      playBeep(440, 0.2, 'sawtooth');
+      addLog('OPTICAL', `[SIMULATION EVENT START] HIGH-VELOCITY DEBRIS ENTERING OPTICAL FOV`, 'WARN');
+      switchTab('OVERVIEW');
+      setCamMode('DETECTION');
+
+      let step = 0;
+      const interval = setInterval(() => {
+        step++;
+        progressFill.style.width = `${step * 10}%`;
+
+        if (step === 2) {
+          playBeep(520, 0.08);
+          addLog('FILTER', `TEMPORAL DIFFERENCE: 46 BACKGROUND STARS CANCELLED`, 'SUCCESS');
+        } else if (step === 4) {
+          playBeep(780, 0.1);
+          addLog('AI', `CORAL EDGE TPU: TARGET ${eventTargetId} IDENTIFIED [SPACE_DEBRIS 98.4%]`, 'ALERT');
+          
+          // Inject event target
+          targets.unshift({
+            id: eventTargetId,
+            type: 'DEBRIS',
+            confidence: 98.4,
+            angularRate: 0.65,
+            relativePosition: { dx: 1.84, dy: -0.92, dz: 0.45, range: 2.10 },
+            relativeVelocity: 9.12,
+            x: 0.42,
+            y: 0.28,
+            streakLength: 32,
+            streakAngle: -55,
+            history: [{ x: 0.38, y: 0.32 }, { x: 0.42, y: 0.28 }],
+            predicted: [{ x: 0.46, y: 0.24 }, { x: 0.50, y: 0.20 }],
+            ra: 198.42,
+            dec: -15.11,
+            mag: 7.82,
+            status: 'TRACKING'
+          });
+          selectedTargetId = eventTargetId;
+          renderTargetsList();
+
+          document.getElementById('alert-content').innerHTML = `
+            <div style="font-weight: 700; color: #fff; margin-bottom: 2px;">TARGET ${eventTargetId} &bull; HIGH MOTION DETECTED</div>
+            <div style="color: var(--text-secondary); font-size: 10px; margin-bottom: 6px;">
+              High angular velocity (0.65°/s). Predicted miss distance 2.1 km.
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted);">
+              <span>CONFIDENCE: <strong style="color: var(--accent-green);">98.4%</strong></span>
+              <span>STATUS: <strong style="color: var(--accent-red);">INTERCEPT RISK</strong></span>
+            </div>
+          `;
+        } else if (step === 6) {
+          playBeep(880, 0.08);
+          addLog('TRACK', `SUB-PIXEL CENTROID RESOLVED: [542.1, 388.4] | J2000 ASTROMETRY LOCKED`, 'INFO');
+        } else if (step === 8) {
+          playBeep(980, 0.08);
+          addLog('TELEMETRY', `64x64 ROI EXTRACTED | 2.3 MB RAW FRAME DISCARDED (>99% REDUCTION)`, 'SUCCESS');
+        } else if (step === 10) {
+          playBeep(1200, 0.25, 'triangle');
+          addLog('TELEMETRY', `UHF AX.25 DOWNLINK CONFIRMED: PACKET RECEIVED AT BENGALURU GROUND STATION`, 'SUCCESS');
+          
+          // Increment metric counters
+          const objEl = document.getElementById('metric-objects');
+          const debEl = document.getElementById('metric-debris');
+          objEl.innerText = Number(objEl.innerText) + 1;
+          debEl.innerText = Number(debEl.innerText) + 1;
+
+          clearInterval(interval);
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            isEventSimulating = false;
+          }, 1000);
+        }
+      }, 1000);
+    });
+
+    // ==========================================
+    // RENDERERS & DATA POPULATORS
+    // ==========================================
+    function renderTargetsList() {
+      const container = document.getElementById('targets-list');
+      if (!container) return;
+
+      container.innerHTML = targets.map(t => {
+        const isSelected = t.id === selectedTargetId;
+        const isDebris = t.type === 'DEBRIS';
+        const isStar = t.type === 'STAR';
+        
+        let color = isDebris ? 'var(--accent-red)' : isStar ? 'var(--accent-blue)' : 'var(--text-muted)';
+        let badgeBg = isDebris ? 'rgba(239,68,68,0.2)' : isStar ? 'rgba(59,130,246,0.2)' : 'rgba(100,116,139,0.2)';
+
+        return `
+          <div onclick="selectTarget('${t.id}')" style="background: var(--bg-secondary); border: 1px solid ${isSelected ? color : 'var(--border-subtle)'}; padding: 6px; border-radius: 2px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <span style="font-weight: 700; color: ${color};">${t.id}</span>
+              <span style="font-size: 8px; background: ${badgeBg}; color: ${color}; padding: 1px 4px; border-radius: 2px;">${t.type}</span>
+              <span style="font-size: 9px; color: var(--accent-green); font-weight: 700;">${t.confidence.toFixed(1)}%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted);">
+              <span>RATE: <strong style="color: var(--accent-cyan);">${t.angularRate.toFixed(2)}°/s</strong></span>
+              <span>VEL: <strong style="color: #fff;">${t.relativeVelocity.toFixed(1)} m/s</strong></span>
+              <span style="color: ${t.status === 'TRACKING' ? 'var(--accent-green)' : 'var(--text-muted)'};">● ${t.status}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectTarget(id) {
+      selectedTargetId = id;
+      renderTargetsList();
+      playBeep(700, 0.03);
+
+      const target = targets.find(t => t.id === id);
+      if (target && target.type === 'DEBRIS') {
+        const hudBox = document.getElementById('target-hud-box');
+        if (hudBox) {
+          hudBox.innerHTML = `
+            <div style="color: var(--accent-red); font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+              <span>TARGET: ${target.id}</span>
+              <span style="font-size: 9px; background: var(--accent-red); color: white; padding: 0 4px; border-radius: 2px;">${target.type}</span>
+            </div>
+            <div style="color: #fff; margin-top: 2px;">CONFIDENCE: <strong style="color: var(--accent-green);">${target.confidence.toFixed(1)}%</strong></div>
+            <div style="color: var(--text-secondary);">MOTION: <span style="color: var(--accent-cyan);">DETECTED (${target.angularRate.toFixed(2)}°/s)</span></div>
+            <div style="color: var(--text-secondary);">EST VEL: <span style="color: #fff;">${target.relativeVelocity.toFixed(1)} m/s</span></div>
+            <div style="color: var(--text-secondary); font-size: 9px;">RA ${target.ra.toFixed(2)}° &bull; DEC ${target.dec.toFixed(2)}°</div>
+          `;
+        }
+
+        const vectorInfo = document.getElementById('radar-vector-info');
+        if (vectorInfo) {
+          vectorInfo.innerHTML = `
+            <span>TARGET: <strong style="color: var(--accent-red);">${target.id}</strong></span>
+            <span>ΔX: <strong style="color: var(--accent-cyan);">${target.relativePosition.dx > 0 ? '+' : ''}${target.relativePosition.dx.toFixed(2)} km</strong> | ΔY: <strong style="color: var(--accent-cyan);">${target.relativePosition.dy > 0 ? '+' : ''}${target.relativePosition.dy.toFixed(2)} km</strong></span>
+            <span>REL V: <strong style="color: #fff;">${target.relativeVelocity.toFixed(1)} m/s</strong></span>
+          `;
+        }
+      }
+    }
+
+    function renderLogs() {
+      const container = document.getElementById('system-logs-container');
+      const fullContainer = document.getElementById('full-logs-container');
+      if (!container && !fullContainer) return;
+
+      const html = systemLogs.slice(0, 30).map(l => {
+        let color = '#E2E8F0';
+        if (l.lvl === 'ALERT') color = 'var(--accent-red)';
+        else if (l.lvl === 'WARN') color = 'var(--accent-amber)';
+        else if (l.lvl === 'SUCCESS') color = 'var(--accent-green)';
+
+        return `
+          <div style="line-height: 1.4; border-bottom: 1px solid rgba(120,160,190,0.06); padding: 2px 0;">
+            <span style="color: var(--text-muted); font-size: 9px;">[${l.ts}]</span>
+            <span style="color: var(--accent-cyan); font-weight: 600; font-size: 9px;">[${l.cat}]</span>
+            <span style="color: ${color};">${l.msg}</span>
+          </div>
+        `;
+      }).join('');
+
+      if (container) container.innerHTML = html;
+      if (fullContainer) fullContainer.innerHTML = html;
+    }
+
+    function filterLogs(category) {
+      document.querySelectorAll('#tab-logs .hud-btn').forEach(b => {
+        if (b.innerText === category) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+
+      const fullContainer = document.getElementById('full-logs-container');
+      if (!fullContainer) return;
+
+      const filtered = category === 'ALL' ? systemLogs : systemLogs.filter(l => l.cat === category || (category === 'WARN' && (l.lvl === 'WARN' || l.lvl === 'ALERT')));
+      fullContainer.innerHTML = filtered.map(l => {
+        let color = '#E2E8F0';
+        if (l.lvl === 'ALERT') color = 'var(--accent-red)';
+        else if (l.lvl === 'WARN') color = 'var(--accent-amber)';
+        else if (l.lvl === 'SUCCESS') color = 'var(--accent-green)';
+
+        return `
+          <div style="line-height: 1.4; border-bottom: 1px solid rgba(120,160,190,0.06); padding: 3px 0;">
+            <span style="color: var(--text-muted); font-size: 9px;">[${l.ts}]</span>
+            <span style="color: var(--accent-cyan); font-weight: 600; font-size: 9px;">[${l.cat}]</span>
+            <span style="color: ${color};">${l.msg}</span>
+          </div>
+        `;
+      }).join('');
+      playBeep(650, 0.03);
+    }
+
+    function renderTimeline() {
+      const container = document.getElementById('timeline-stages');
+      if (!container) return;
+
+      container.innerHTML = PIPELINE_STAGES.map((s, idx) => `
+        <div onclick="inspectStage('${s.id}')" style="flex: 1; min-width: 100px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); padding: 6px; border-radius: 2px; cursor: pointer; transition: all 0.2s; text-align: center;">
+          <div style="font-size: 8px; color: var(--accent-cyan);">${idx + 1}. STAGE</div>
+          <div style="font-size: 10px; font-weight: 700; color: #fff; margin: 2px 0;">${s.label.split('. ')[1]}</div>
+          <div style="font-size: 8px; color: var(--accent-green);">${s.time}</div>
+        </div>
+      `).join('');
+    }
+
+    function inspectStage(id) {
+      const stage = PIPELINE_STAGES.find(s => s.id === id);
+      if (!stage) return;
+      document.getElementById('stage-inspector-desc').innerText = `STAGE ${stage.label}: ${stage.desc} (Ops: ${stage.ops})`;
+      document.getElementById('stage-inspector-hw').innerText = `${stage.hw} &bull; ${stage.time}`;
+      playBeep(750, 0.04);
+    }
+
+    function renderEdgeAIPipeline() {
+      const container = document.getElementById('ai-pipeline-steps');
+      if (!container) return;
+
+      container.innerHTML = PIPELINE_STAGES.map((s, idx) => `
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); padding: 8px; border-radius: 2px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-weight: 700; font-size: 11px; color: #fff;">${s.label}</div>
+            <div style="font-size: 9px; color: var(--text-muted);">${s.desc}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan);">${s.time}</div>
+            <div style="font-size: 8px; color: var(--accent-green); background: rgba(16,185,129,0.1); padding: 1px 4px; border-radius: 2px;">${s.ops}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTelemetryTable() {
+      const container = document.getElementById('telemetry-table-container');
+      if (!container) return;
+
+      container.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 9px; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border-subtle); color: var(--text-muted);">
+              <th style="padding: 4px;">PKT ID</th>
+              <th>TARGET</th>
+              <th>CLASS</th>
+              <th>RA / DEC</th>
+              <th>ANG RATE</th>
+              <th>SIZE</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid rgba(120,160,190,0.06); color: #fff;">
+              <td style="padding: 4px; color: var(--accent-cyan);">#10842</td>
+              <td style="color: var(--accent-red); font-weight: 700;">D-017</td>
+              <td>DEBRIS</td>
+              <td>184.3° / -12.8°</td>
+              <td>0.42°/s</td>
+              <td style="color: var(--accent-green);">178 B</td>
+              <td style="color: var(--accent-green);">CONFIRMED</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(120,160,190,0.06); color: #fff;">
+              <td style="padding: 4px; color: var(--accent-cyan);">#10841</td>
+              <td style="color: var(--accent-red); font-weight: 700;">D-018</td>
+              <td>DEBRIS</td>
+              <td>142.1° / +24.6°</td>
+              <td>0.28°/s</td>
+              <td style="color: var(--accent-green);">182 B</td>
+              <td style="color: var(--accent-green);">CONFIRMED</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(120,160,190,0.06); color: #fff;">
+              <td style="padding: 4px; color: var(--accent-cyan);">#10840</td>
+              <td style="color: var(--accent-blue);">S-041</td>
+              <td>STAR</td>
+              <td>215.1° / -45.0°</td>
+              <td>0.01°/s</td>
+              <td style="color: var(--text-muted);">SUPPRESSED</td>
+              <td style="color: var(--text-muted);">DROPPED</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    // ==========================================
+    // CANVAS ENGINES
+    // ==========================================
+
+    // 1. STARFIELD & LIVE CAMERA CANVAS
+    const camCanvas = document.getElementById('camera-canvas');
+    const camCtx = camCanvas ? camCanvas.getContext('2d') : null;
+    const rawCanvas = document.getElementById('raw-canvas');
+    const rawCtx = rawCanvas ? rawCanvas.getContext('2d') : null;
+    const fltCanvas = document.getElementById('filtered-canvas');
+    const fltCtx = fltCanvas ? fltCanvas.getContext('2d') : null;
+
+    // Generate static realistic star catalogue
+    const stars = [];
+    for (let i = 0; i < 220; i++) {
+      stars.push({
+        x: Math.random(),
+        y: Math.random(),
+        brightness: Math.random() * 0.8 + 0.2,
+        twinkleSpeed: Math.random() * 0.05 + 0.02
+      });
+    }
+
+    // Cosmic ray artifacts simulator
+    let cosmicRays = [];
+
+    function renderCameraFeed() {
+      if (!camCtx) return;
+      const w = camCanvas.width;
+      const h = camCanvas.height;
+
+      // Deep space black background
+      camCtx.fillStyle = '#020408';
+      camCtx.fillRect(0, 0, w, h);
+
+      // Earth limb curvature glow in bottom-left corner
+      const earthGrad = camCtx.createRadialGradient(0, h + 80, 50, 0, h + 80, 260);
+      earthGrad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+      earthGrad.addColorStop(0.7, 'rgba(30, 64, 175, 0.08)');
+      earthGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      camCtx.fillStyle = earthGrad;
+      camCtx.fillRect(0, 0, w, h);
+
+      // Earth atmospheric edge curve
+      camCtx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      camCtx.lineWidth = 1.5;
+      camCtx.beginPath();
+      camCtx.arc(0, h + 80, 260, -Math.PI / 2, 0);
+      camCtx.stroke();
+
+      // Draw Starfield (Twinkling)
+      if (cameraMode !== 'FILTERED') {
+        camCtx.fillStyle = '#FFFFFF';
+        stars.forEach(s => {
+          const alpha = s.brightness + Math.sin(Date.now() * s.twinkleSpeed) * 0.15;
+          camCtx.globalAlpha = Math.max(0.1, Math.min(1, alpha));
+          camCtx.fillRect(s.x * w, s.y * h, 1.5, 1.5);
+        });
+        camCtx.globalAlpha = 1.0;
+      }
+
+      // Cosmic rays (occasional sharp streaks in RAW or DETECTION mode)
+      if (Math.random() < 0.03 && cameraMode !== 'FILTERED') {
+        cosmicRays.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          dx: (Math.random() - 0.5) * 20,
+          dy: (Math.random() - 0.5) * 20,
+          life: 4
+        });
+      }
+      camCtx.strokeStyle = '#FFFFFF';
+      camCtx.lineWidth = 1.2;
+      cosmicRays.forEach((cr, idx) => {
+        camCtx.beginPath();
+        camCtx.moveTo(cr.x, cr.y);
+        camCtx.lineTo(cr.x + cr.dx, cr.y + cr.dy);
+        camCtx.stroke();
+        cr.life--;
+        if (cr.life <= 0) cosmicRays.splice(idx, 1);
+      });
+
+      // Draw moving targets
+      targets.forEach(t => {
+        const px = t.x * w;
+        const py = t.y * h;
+
+        if (t.type === 'DEBRIS') {
+          // Streak line
+          const rad = (t.streakAngle * Math.PI) / 180;
+          const sx = px - Math.cos(rad) * t.streakLength;
+          const sy = py - Math.sin(rad) * t.streakLength;
+
+          // Motion streak with gradient
+          const streakGrad = camCtx.createLinearGradient(sx, sy, px, py);
+          streakGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          streakGrad.addColorStop(1, '#FFFFFF');
+          camCtx.strokeStyle = streakGrad;
+          camCtx.lineWidth = 2;
+          camCtx.beginPath();
+          camCtx.moveTo(sx, sy);
+          camCtx.lineTo(px, py);
+          camCtx.stroke();
+
+          // Bright center centroid
+          camCtx.fillStyle = '#FFFFFF';
+          camCtx.beginPath();
+          camCtx.arc(px, py, 2.5, 0, Math.PI * 2);
+          camCtx.fill();
+
+          // AI BOUNDING BOX & RETICLE
+          if (cameraMode === 'DETECTION' || cameraMode === 'TRACKING' || cameraMode === 'ROI') {
+            const isSelected = t.id === selectedTargetId;
+            const boxColor = isSelected ? '#EF4444' : '#00F0FF';
+            const boxSize = cameraMode === 'ROI' && isSelected ? 48 : 32;
+
+            camCtx.strokeStyle = boxColor;
+            camCtx.lineWidth = isSelected ? 1.8 : 1.2;
+            
+            // Corner reticle
+            const half = boxSize / 2;
+            const arm = 6;
+
+            // Top-left
+            camCtx.beginPath();
+            camCtx.moveTo(px - half, py - half + arm);
+            camCtx.lineTo(px - half, py - half);
+            camCtx.lineTo(px - half + arm, py - half);
+            camCtx.stroke();
+
+            // Top-right
+            camCtx.beginPath();
+            camCtx.moveTo(px + half - arm, py - half);
+            camCtx.lineTo(px + half, py - half);
+            camCtx.lineTo(px + half, py - half + arm);
+            camCtx.stroke();
+
+            // Bottom-left
+            camCtx.beginPath();
+            camCtx.moveTo(px - half, py + half - arm);
+            camCtx.lineTo(px - half, py + half);
+            camCtx.lineTo(px - half + arm, py + half);
+            camCtx.stroke();
+
+            // Bottom-right
+            camCtx.beginPath();
+            camCtx.moveTo(px + half - arm, py + half);
+            camCtx.lineTo(px + half, py + half);
+            camCtx.lineTo(px + half, py + half - arm);
+            camCtx.stroke();
+
+            // Label text beside bounding box
+            camCtx.fillStyle = boxColor;
+            camCtx.font = '10px JetBrains Mono, monospace';
+            camCtx.fillText(`${t.id} [${t.confidence.toFixed(1)}%]`, px + half + 4, py - half + 8);
+            camCtx.fillStyle = 'rgba(255,255,255,0.7)';
+            camCtx.font = '8px JetBrains Mono, monospace';
+            camCtx.fillText(`RATE: ${t.angularRate.toFixed(2)}°/s`, px + half + 4, py - half + 18);
+          }
+
+          // Trajectory prediction line in TRACKING mode
+          if (cameraMode === 'TRACKING') {
+            camCtx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
+            camCtx.lineWidth = 1;
+            camCtx.setLineDash([3, 3]);
+            camCtx.beginPath();
+            camCtx.moveTo(px, py);
+            t.predicted.forEach(pt => camCtx.lineTo(pt.x * w, pt.y * h));
+            camCtx.stroke();
+            camCtx.setLineDash([]);
+          }
+        }
+      });
+
+      // Synchronize Before/After frames in Tab 2 if visible
+      if (activeTab === 'CAMERA' && rawCtx && fltCtx) {
+        // Raw Frame
+        rawCtx.fillStyle = '#020408';
+        rawCtx.fillRect(0, 0, rawCanvas.width, rawCanvas.height);
+        stars.forEach(s => {
+          rawCtx.fillStyle = 'rgba(255,255,255,0.85)';
+          rawCtx.fillRect(s.x * rawCanvas.width, s.y * rawCanvas.height, 2, 2);
+        });
+        // Raw thermal noise
+        rawCtx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+        for (let i = 0; i < 30; i++) rawCtx.fillRect(Math.random() * rawCanvas.width, Math.random() * rawCanvas.height, 1, 1);
+        
+        // Filtered Frame (Cleaned, only debris highlighted)
+        fltCtx.fillStyle = '#020408';
+        fltCtx.fillRect(0, 0, fltCanvas.width, fltCanvas.height);
+        targets.filter(t => t.type === 'DEBRIS').forEach(t => {
+          const fx = t.x * fltCanvas.width;
+          const fy = t.y * fltCanvas.height;
+          fltCtx.fillStyle = '#00F0FF';
+          fltCtx.beginPath();
+          fltCtx.arc(fx, fy, 4, 0, Math.PI * 2);
+          fltCtx.fill();
+          fltCtx.strokeStyle = 'rgba(0,240,255,0.6)';
+          fltCtx.strokeRect(fx - 16, fy - 16, 32, 32);
+          fltCtx.fillStyle = '#fff';
+          fltCtx.font = '10px monospace';
+          fltCtx.fillText(`${t.id} [DEBRIS 96.8%]`, fx + 20, fy);
+        });
+      }
+    }
+
+    // 2. 2D ORBITAL RADAR CANVAS (SECTION 9)
+    const radarCanvas = document.getElementById('radar-canvas');
+    const radarCtx = radarCanvas ? radarCanvas.getContext('2d') : null;
+    let sweepAngle = 0;
+
+    function renderRadar() {
+      if (!radarCtx) return;
+      const w = radarCanvas.width;
+      const h = radarCanvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxR = Math.min(w, h) / 2 - 12;
+
+      radarCtx.fillStyle = '#070B12';
+      radarCtx.fillRect(0, 0, w, h);
+
+      // Radar Range Rings
+      [0.25, 0.5, 0.75, 1.0].forEach((ratio, idx) => {
+        radarCtx.beginPath();
+        radarCtx.arc(cx, cy, maxR * ratio, 0, Math.PI * 2);
+        radarCtx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
+        radarCtx.setLineDash([2, 4]);
+        radarCtx.stroke();
+        radarCtx.setLineDash([]);
+        radarCtx.fillStyle = 'rgba(0, 240, 255, 0.35)';
+        radarCtx.font = '8px JetBrains Mono, monospace';
+        radarCtx.fillText(`${(idx + 1) * 2} km`, cx + maxR * ratio - 20, cy - 3);
+      });
+
+      // Axes
+      radarCtx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx - maxR, cy); radarCtx.lineTo(cx + maxR, cy);
+      radarCtx.moveTo(cx, cy - maxR); radarCtx.lineTo(cx, cy + maxR);
+      radarCtx.stroke();
+
+      // Sweeping beam
+      sweepAngle += 0.02 * simSpeed;
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy);
+      radarCtx.arc(cx, cy, maxR, sweepAngle - 0.3, sweepAngle);
+      radarCtx.closePath();
+      const beamGrad = radarCtx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+      beamGrad.addColorStop(0, 'rgba(0,240,255,0)');
+      beamGrad.addColorStop(1, 'rgba(0,240,255,0.12)');
+      radarCtx.fillStyle = beamGrad;
+      radarCtx.fill();
+
+      // CubeSat at Center
+      radarCtx.fillStyle = '#00F0FF';
+      radarCtx.beginPath();
+      radarCtx.arc(cx, cy, 4, 0, Math.PI * 2);
+      radarCtx.fill();
+      radarCtx.fillText('BX-01', cx + 7, cy + 3);
+
+      // Targets
+      targets.forEach(t => {
+        if (t.type !== 'DEBRIS') return;
+        const scale = maxR / 6.0;
+        const tx = cx + t.relativePosition.dx * scale;
+        const ty = cy + t.relativePosition.dy * scale;
+        const isSelected = t.id === selectedTargetId;
+
+        // Predicted Trajectory line
+        radarCtx.strokeStyle = isSelected ? 'rgba(239,68,68,0.7)' : 'rgba(0,240,255,0.5)';
+        radarCtx.setLineDash([3, 3]);
+        radarCtx.beginPath();
+        radarCtx.moveTo(tx, ty);
+        t.predicted.forEach(pt => {
+          radarCtx.lineTo(cx + (pt.x - 0.5) * 2 * maxR, cy + (pt.y - 0.5) * 2 * maxR);
+        });
+        radarCtx.stroke();
+        radarCtx.setLineDash([]);
+
+        // Target dot
+        radarCtx.fillStyle = isSelected ? '#EF4444' : '#00F0FF';
+        radarCtx.beginPath();
+        radarCtx.arc(tx, ty, isSelected ? 4.5 : 3.5, 0, Math.PI * 2);
+        radarCtx.fill();
+
+        radarCtx.fillStyle = isSelected ? '#FCA5A5' : '#E2E8F0';
+        radarCtx.font = '9px monospace';
+        radarCtx.fillText(t.id, tx + 6, ty - 4);
+      });
+    }
+
+    // 3. 3D CUBESAT VISUALIZATION ENGINE (SECTION 10)
+    const cubesatCanvas = document.getElementById('cubesat-canvas');
+    const cubesatCtx = cubesatCanvas ? cubesatCanvas.getContext('2d') : null;
+    let cubeRotX = 0.4;
+    let cubeRotY = 0.6;
+    let isDraggingCube = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    if (cubesatCanvas) {
+      cubesatCanvas.addEventListener('mousedown', (e) => {
+        isDraggingCube = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      });
+      window.addEventListener('mouseup', () => isDraggingCube = false);
+      window.addEventListener('mousemove', (e) => {
+        if (!isDraggingCube) return;
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+        cubeRotY += dx * 0.01;
+        cubeRotX += dy * 0.01;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      });
+    }
+
+    function render3DCubeSat() {
+      if (!cubesatCtx) return;
+      const w = cubesatCanvas.width;
+      const h = cubesatCanvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+
+      cubesatCtx.fillStyle = '#070B12';
+      cubesatCtx.fillRect(0, 0, w, h);
+
+      if (autoRotateCubeSat && !isDraggingCube) {
+        cubeRotY += 0.012 * simSpeed;
+      }
+
+      // 3D vertices of a 1U CubeSat (10x10x10 cube)
+      const size = 36;
+      const v = [
+        [-size, -size, -size], [size, -size, -size], [size, size, -size], [-size, size, -size],
+        [-size, -size, size], [size, -size, size], [size, size, size], [-size, size, size]
+      ];
+
+      // Rotate 3D vertices
+      const cosY = Math.cos(cubeRotY);
+      const sinY = Math.sin(cubeRotY);
+      const cosX = Math.cos(cubeRotX);
+      const sinX = Math.sin(cubeRotX);
+
+      const projected = v.map(([x, y, z]) => {
+        // Rotate around Y
+        const x1 = x * cosY + z * sinY;
+        const z1 = -x * sinY + z * cosY;
+        // Rotate around X
+        const y2 = y * cosX - z1 * sinX;
+        const z2 = y * sinX + z1 * cosX;
+        // Perspective projection
+        const scale = 240 / (z2 + 240);
+        return [cx + x1 * scale, cy + y2 * scale, z2];
+      });
+
+      // Faces definition: [v1, v2, v3, v4, normal_approx_color]
+      const faces = [
+        [0, 1, 2, 3, 'rgba(15, 23, 42, 0.85)', 'SOLAR_1'],
+        [4, 5, 6, 7, 'rgba(30, 41, 59, 0.9)', 'CAMERA_FACE'],
+        [0, 1, 5, 4, 'rgba(15, 23, 42, 0.8)', 'SOLAR_TOP'],
+        [2, 3, 7, 6, 'rgba(15, 23, 42, 0.8)', 'BOTTOM'],
+        [0, 3, 7, 4, 'rgba(20, 30, 50, 0.85)', 'SIDE_L'],
+        [1, 2, 6, 5, 'rgba(20, 30, 50, 0.85)', 'SIDE_R']
+      ];
+
+      // Sort faces by average depth (Z-buffer painter's algorithm)
+      faces.sort((a, b) => {
+        const az = (projected[a[0]][2] + projected[a[1]][2] + projected[a[2]][2] + projected[a[3]][2]) / 4;
+        const bz = (projected[b[0]][2] + projected[b[1]][2] + projected[b[2]][2] + projected[b[3]][2]) / 4;
+        return az - bz;
+      });
+
+      // Draw faces
+      faces.forEach(f => {
+        cubesatCtx.beginPath();
+        cubesatCtx.moveTo(projected[f[0]][0], projected[f[0]][1]);
+        cubesatCtx.lineTo(projected[f[1]][0], projected[f[1]][1]);
+        cubesatCtx.lineTo(projected[f[2]][0], projected[f[2]][1]);
+        cubesatCtx.lineTo(projected[f[3]][0], projected[f[3]][1]);
+        cubesatCtx.closePath();
+        
+        cubesatCtx.fillStyle = f[4];
+        cubesatCtx.fill();
+        cubesatCtx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+        cubesatCtx.lineWidth = 1.2;
+        cubesatCtx.stroke();
+
+        // Solar grid texture on faces
+        if (f[5].includes('SOLAR')) {
+          cubesatCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+          cubesatCtx.stroke();
+        }
+      });
+
+      // Camera Aperture Lens on front face
+      const frontCenter = [
+        (projected[4][0] + projected[5][0] + projected[6][0] + projected[7][0]) / 4,
+        (projected[4][1] + projected[5][1] + projected[6][1] + projected[7][1]) / 4
+      ];
+      cubesatCtx.fillStyle = '#00F0FF';
+      cubesatCtx.beginPath();
+      cubesatCtx.arc(frontCenter[0], frontCenter[1], 4, 0, Math.PI * 2);
+      cubesatCtx.fill();
+
+      // Transparent FOV cone projecting from camera aperture
+      cubesatCtx.beginPath();
+      cubesatCtx.moveTo(frontCenter[0], frontCenter[1]);
+      cubesatCtx.lineTo(frontCenter[0] - 45, frontCenter[1] + 55);
+      cubesatCtx.lineTo(frontCenter[0] + 45, frontCenter[1] + 55);
+      cubesatCtx.closePath();
+      cubesatCtx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+      cubesatCtx.fill();
+      cubesatCtx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
+      cubesatCtx.setLineDash([2, 3]);
+      cubesatCtx.stroke();
+      cubesatCtx.setLineDash([]);
+    }
+
+    // 4. EARTH DOWNLINK CANVAS (SECTION 12)
+    const downlinkCanvas = document.getElementById('downlink-canvas');
+    const dlCtx = downlinkCanvas ? downlinkCanvas.getContext('2d') : null;
+    let packetTravelT = 0;
+
+    function renderDownlink() {
+      if (!dlCtx) return;
+      const w = downlinkCanvas.width;
+      const h = downlinkCanvas.height;
+
+      dlCtx.fillStyle = '#070B12';
+      dlCtx.fillRect(0, 0, w, h);
+
+      // CubeSat on Top-Left
+      const satX = 35;
+      const satY = 30;
+      dlCtx.fillStyle = '#00F0FF';
+      dlCtx.fillRect(satX - 6, satY - 6, 12, 12);
+      dlCtx.fillStyle = '#FFFFFF';
+      dlCtx.font = '8px monospace';
+      dlCtx.fillText('BX-01', satX - 12, satY - 10);
+
+      // Earth Globe on Bottom-Right
+      const earthX = w - 40;
+      const earthY = h + 20;
+      const earthR = 60;
+      const globeGrad = dlCtx.createRadialGradient(earthX - 10, earthY - 20, 10, earthX, earthY, earthR);
+      globeGrad.addColorStop(0, '#1E3A8A');
+      globeGrad.addColorStop(0.7, '#0F172A');
+      globeGrad.addColorStop(1, '#020617');
+      dlCtx.fillStyle = globeGrad;
+      dlCtx.beginPath();
+      dlCtx.arc(earthX, earthY, earthR, 0, Math.PI * 2);
+      dlCtx.fill();
+      dlCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      dlCtx.stroke();
+
+      // Ground Station Pin (Bengaluru)
+      const gsX = earthX - 25;
+      const gsY = earthY - 50;
+      dlCtx.fillStyle = '#10B981';
+      dlCtx.beginPath();
+      dlCtx.arc(gsX, gsY, 3.5, 0, Math.PI * 2);
+      dlCtx.fill();
+      dlCtx.fillText('BENGALURU GS', gsX - 60, gsY - 6);
+
+      // Downlink Beam
+      dlCtx.strokeStyle = 'rgba(59, 130, 246, 0.35)';
+      dlCtx.lineWidth = 1.5;
+      dlCtx.setLineDash([4, 4]);
+      dlCtx.beginPath();
+      dlCtx.moveTo(satX, satY);
+      dlCtx.lineTo(gsX, gsY);
+      dlCtx.stroke();
+      dlCtx.setLineDash([]);
+
+      // Traveling Packet Pulse
+      packetTravelT = (packetTravelT + 0.015 * simSpeed) % 1;
+      const curX = satX + (gsX - satX) * packetTravelT;
+      const curY = satY + (gsY - satY) * packetTravelT;
+
+      dlCtx.fillStyle = '#00F0FF';
+      dlCtx.beginPath();
+      dlCtx.arc(curX, curY, 3, 0, Math.PI * 2);
+      dlCtx.fill();
+    }
+
+    // 5. LIVE POWER WAVEFORM CANVAS (SECTION 13)
+    const powerCanvas = document.getElementById('power-canvas');
+    const pwrCtx = powerCanvas ? powerCanvas.getContext('2d') : null;
+    let powerHistory = [];
+    for (let i = 0; i < 40; i++) {
+      powerHistory.push({
+        solar: 4.8 + Math.sin(i * 0.2) * 0.3,
+        load: 3.75 + Math.cos(i * 0.3) * 0.15,
+        bat: 92.4 + (i * 0.02)
+      });
+    }
+
+    function renderPowerGraph() {
+      if (!pwrCtx) return;
+      const w = powerCanvas.width;
+      const h = powerCanvas.height;
+
+      pwrCtx.fillStyle = '#070B12';
+      pwrCtx.fillRect(0, 0, w, h);
+
+      // Grid lines
+      pwrCtx.strokeStyle = 'rgba(120, 160, 190, 0.08)';
+      pwrCtx.lineWidth = 1;
+      for (let y = 30; y < h; y += 40) {
+        pwrCtx.beginPath();
+        pwrCtx.moveTo(0, y); pwrCtx.lineTo(w, y);
+        pwrCtx.stroke();
+      }
+
+      // Draw Solar Waveform (Green)
+      pwrCtx.strokeStyle = '#10B981';
+      pwrCtx.lineWidth = 2;
+      pwrCtx.beginPath();
+      powerHistory.forEach((pt, idx) => {
+        const x = (idx / (powerHistory.length - 1)) * w;
+        const y = h - (pt.solar / 6.0) * (h - 40);
+        if (idx === 0) pwrCtx.moveTo(x, y);
+        else pwrCtx.lineTo(x, y);
+      });
+      pwrCtx.stroke();
+
+      // Draw System Load Waveform (Cyan)
+      pwrCtx.strokeStyle = '#00F0FF';
+      pwrCtx.lineWidth = 2;
+      pwrCtx.beginPath();
+      powerHistory.forEach((pt, idx) => {
+        const x = (idx / (powerHistory.length - 1)) * w;
+        const y = h - (pt.load / 6.0) * (h - 40);
+        if (idx === 0) pwrCtx.moveTo(x, y);
+        else pwrCtx.lineTo(x, y);
+      });
+      pwrCtx.stroke();
+    }
+
+    // ==========================================
+    // MAIN REAL-TIME SIMULATION TICK LOOP
+    // ==========================================
+    let metSeconds = 841202;
+
+    setInterval(() => {
+      if (!isRunning) return;
+
+      // 1. Clocks
+      metSeconds += 1 * simSpeed;
+      const d = Math.floor(metSeconds / 86400);
+      const remH = Math.floor((metSeconds % 86400) / 3600);
+      const remM = Math.floor((metSeconds % 3600) / 60);
+      const remS = metSeconds % 60;
+      document.getElementById('clock-met').innerText = `MET ${String(d).padStart(2,'0')}d ${String(remH).padStart(2,'0')}:${String(remM).padStart(2,'0')}:${String(remS).padStart(2,'0')}`;
+      
+      const now = new Date();
+      document.getElementById('clock-utc').innerText = now.toUTCString().slice(17, 25) + ' UTC';
+
+      // 2. Telemetry Orbit Drifts
+      const alt = (519.4 + Math.sin(metSeconds * 0.05) * 0.4).toFixed(1);
+      const vel = (7.61 + Math.cos(metSeconds * 0.03) * 0.02).toFixed(2);
+      document.getElementById('telemetry-alt').innerText = `~${alt} KM`;
+      document.getElementById('telemetry-vel').innerText = `~${vel} KM/S`;
+
+      // 3. Frame counter
+      frameCount += 1;
+      document.getElementById('cam-frame-no').innerText = String(frameCount).padStart(8, '0');
+      document.getElementById('metric-frames').innerText = frameCount.toLocaleString();
+
+      // 4. Move targets slightly along trajectory
+      targets.forEach(t => {
+        if (t.status !== 'TRACKING') return;
+        const rad = (t.streakAngle * Math.PI) / 180;
+        const speed = t.angularRate * 0.002 * simSpeed;
+        t.x += Math.cos(rad) * speed;
+        t.y += Math.sin(rad) * speed;
+        if (t.x > 0.95) t.x = 0.05;
+        if (t.x < 0.05) t.x = 0.95;
+        if (t.y > 0.95) t.y = 0.05;
+        if (t.y < 0.05) t.y = 0.95;
+
+        t.confidence = Math.min(99.9, Math.max(89.0, t.confidence + (Math.random() - 0.5) * 0.3));
+      });
+
+      // 5. Update power history
+      const newSolar = Number((4.82 + (Math.random() - 0.5) * 0.2).toFixed(2));
+      const newLoad = Number((3.75 + (Math.random() - 0.5) * 0.1).toFixed(2));
+      const newBat = Number(Math.min(98, 92.4 + (Math.random() - 0.5) * 0.1).toFixed(1));
+      
+      powerHistory.shift();
+      powerHistory.push({ solar: newSolar, load: newLoad, bat: newBat });
+
+      document.getElementById('pwr-solar').innerText = `${newSolar} W`;
+      document.getElementById('pwr-total').innerText = `${newLoad} W`;
+      document.getElementById('battery-text').innerText = `${newBat}%`;
+      document.getElementById('battery-fill').style.width = `${newBat}%`;
+
+    }, 1000);
+
+    // ==========================================
+    // RENDER ANIMATION FRAME (60 FPS)
+    // ==========================================
+    function mainRenderLoop() {
+      renderCameraFeed();
+      renderRadar();
+      render3DCubeSat();
+      renderDownlink();
+      if (activeTab === 'POWER') renderPowerGraph();
+      requestAnimationFrame(mainRenderLoop);
+    }
+
+    // Initialize View
+    window.addEventListener('DOMContentLoaded', () => {
+      renderTargetsList();
+      renderLogs();
+      renderTimeline();
+      renderEdgeAIPipeline();
+      renderTelemetryTable();
+      mainRenderLoop();
+    });
+  </script>
+</body>
+</html>
